@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>醫師遠距開藥與配送管理</title>
+<style>
+  /* === 全局樣式 === */
+  * { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+  }
+  
+  html, body {
+    height: 100%;
+    font-family: 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #333;
+    line-height: 1.6;
+  }
+
+  /* === 頁面頭部 === */
+  .header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .user-info strong {
+    font-size: 1.2rem;
+    color: #667eea;
+    font-weight: 600;
+  }
+
+  .user-info span {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    color: #667eea;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+  }
+
+  .logout-btn {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+  }
+
+  .logout-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  }
+
+  /* === 主標題 === */
+  .main-title {
+    text-align: center;
+    color: white;
+    margin: 2rem 0;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    font-size: 2.2rem;
+    font-weight: 300;
+  }
+
+  /* === 主容器 === */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto 3rem;
+    padding: 0 1rem;
+  }
+
+  /* === 錯誤訊息 === */
+  .error-message {
+    background: rgba(255, 235, 238, 0.9);
+    color: #c62828;
+    padding: 1rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+    text-align: center;
+    border-left: 4px solid #f44336;
+    backdrop-filter: blur(5px);
+  }
+
+  /* === 警告訊息樣式 === */
+  .warning-message {
+    background: rgba(255, 244, 229, 0.9);
+    border-left: 4px solid #ff9800;
+    color: #ff9800;
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
+  }
+
+  /* === 標籤頁 === */
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.5rem;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+  }
+
+  .tab {
+    padding: 0.75rem 1.5rem;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: white;
+    font-weight: 500;
+    text-align: center;
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .tab:hover {
+    background: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .tab.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  /* === 表單區塊 === */
+  .form-box {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 2rem;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    backdrop-filter: blur(10px);
+    display: none;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .form-box.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .form-box h2 {
+    color: #667eea;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+    padding-bottom: 0.5rem;
+  }
+
+  /* === 表單元素 === */
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #555;
+  }
+
+  select, input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  select:focus, input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  /* === 按鈕群組樣式 === */
+  .button-group {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  /* === 按鈕 === */
+  .btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+
+  .btn:active {
+    transform: translateY(0);
+  }
+
+  .btn-secondary {
+    background: linear-gradient(135deg, #ff8a65, #ff7043);
+  }
+
+  .btn-secondary:hover {
+    box-shadow: 0 6px 20px rgba(255, 138, 101, 0.4);
+  }
+
+  /* === 危險按鈕樣式 === */
+  .btn-danger {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52) !important;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3) !important;
+  }
+
+  .btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4) !important;
+  }
+
+  /* === 刷新按鈕樣式 === */
+  .refresh-btn {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    margin-left: 0.5rem;
+  }
+
+  .refresh-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+  }
+
+  .refresh-btn:active {
+    transform: translateY(0);
+  }
+
+  /* === 表格 === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.5rem;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  th, td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  th {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    font-weight: 600;
+  }
+
+  tr:hover {
+    background: rgba(102, 126, 234, 0.05);
+  }
+
+  .table-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .table-btn.primary {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+  }
+
+  .table-btn.secondary {
+    background: rgba(255, 138, 101, 0.1);
+    color: #ff8a65;
+  }
+
+  .table-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  /* === 模態框 === */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    backdrop-filter: blur(5px);
+  }
+
+  .modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 15px;
+    max-width: 90%;
+    max-height: 80%;
+    overflow: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: modalFadeIn 0.3s ease;
+  }
+
+  @keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .modal h3 {
+    color: #667eea;
+    margin-bottom: 1rem;
+  }
+
+  /* === 刪除確認模態框樣式 === */
+  .delete-confirm-modal .modal-content {
+    max-width: 400px;
+    text-align: center;
+  }
+
+  .delete-confirm-modal .modal-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+
+  .delete-confirm-modal .modal-buttons button {
+    min-width: 100px;
+  }
+
+  /* === 載入動畫 === */
+  .loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* === 成功訊息樣式 === */
+  .success-message {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #4CAF50;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slideOut {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+  }
+
+  /* === 網格佈局 === */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+
+  /* === 卡片樣式 === */
+  .card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    margin-bottom: 1.5rem;
+  }
+
+  /* === 下拉選單容器 === */
+  .select-with-refresh {
+    display: flex;
+    align-items: center;
+  }
+
+  .select-with-refresh select {
+    flex: 1;
+  }
+
+  /* === 固定值顯示 === */
+  .fixed-value {
+    background: #e9ecef;
+    padding: 0.75rem;
+    border-radius: 8px;
+    font-weight: 500;
+    color: #495057;
+    margin: 0.5rem 0;
+  }
+
+  /* === 藥師提示訊息 === */
+  .pharmacist-hint {
+    background: #e8f5e8;
+    border: 1px solid #4caf50;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #2e7d32;
+  }
+
+  /* === 響應式設計 === */
+  @media (max-width: 768px) {
+    .header {
+      padding: 1rem;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .user-info {
+      flex-direction: column;
+      gap: 0.5rem;
+      text-align: center;
+    }
+    
+    .tabs {
+      flex-direction: column;
+    }
+    
+    .form-box {
+      padding: 1.5rem;
+    }
+    
+    .button-group {
+      flex-direction: column;
+    }
+    
+    .button-group .btn {
+      width: 100%;
+    }
+    
+    .main-title {
+      font-size: 1.8rem;
+      margin: 1.5rem 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- 頁面頭部 - 顯示使用者資訊 -->
+<div class="header">
+  <div class="user-info">
+    <strong>👨‍⚕️ 醫師系統</strong>
+    <span id="currentOrganization">載入中...</span>
+    <span id="currentUser">載入中...</span>
+  </div>
+  <button class="logout-btn" onclick="logout()">登出系統</button>
+</div>
+
+<h1 class="main-title">醫師遠距開藥與配送管理</h1>
+
+<div class="container">
+  <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+  <!-- Tab 切換 -->
+  <div class="tabs">
+    <div class="tab active" data-target="medCreate">📝 建立處方</div>
+    <div class="tab" data-target="medEdit">✏️ 修改處方</div>
+    <div class="tab" data-target="srCreate">🚚 建立配送</div>
+    <div class="tab" data-target="notification">🔔 醫師通知</div>
+  </div>
+
+  <!-- 建立 MedicationRequest -->
+  <div class="form-box active" id="medCreate">
+    <h2>建立新處方</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>選擇病人</label>
+        <select id="patientSelect">
+          <option value="">-- 請選擇病人 --</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>選擇藥師（可選）</label>
+        <select id="medPharmacistSelect">
+          <option value="">-- 請選擇藥師 --</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>藥品名稱</label>
+        <input type="text" id="medName" placeholder="Amoxicillin 500mg">
+      </div>
+      
+      <div class="form-group">
+        <label>藥品代碼（RxNorm）</label>
+        <input type="text" id="medCode" placeholder="1049630">
+      </div>
+      
+      <div class="form-group">
+        <label>劑量（每次）</label>
+        <input type="number" id="doseValue" placeholder="500">
+      </div>
+      
+      <div class="form-group">
+        <label>劑量單位</label>
+        <input type="text" id="doseUnit" placeholder="mg">
+      </div>
+      
+      <div class="form-group">
+        <label>每日服用次數</label>
+        <input type="number" id="frequency" placeholder="3">
+      </div>
+      
+      <div class="form-group">
+        <label>服用天數</label>
+        <input type="number" id="days" placeholder="7">
+      </div>
+    </div>
+    
+    <button class="btn" type="button" onclick="createMedicationRequest()">
+      💊 送出處方
+    </button>
+  </div>
+
+  <!-- 修改 MedicationRequest -->
+  <div class="form-box" id="medEdit">
+    <h2>修改現有處方</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>選擇病人</label>
+        <select id="patientSelectEdit">
+          <option value="">-- 請選擇病人 --</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>選擇處方</label>
+        <div class="select-with-refresh">
+          <select id="medEditSelect">
+            <option value="">-- 請選擇處方 --</option>
+          </select>
+          <button class="refresh-btn" onclick="refreshMedicationRequests('edit')">
+            🔄
+          </button>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>藥品名稱</label>
+        <input type="text" id="medNameEdit">
+      </div>
+      
+      <div class="form-group">
+        <label>劑量（每次）</label>
+        <input type="number" id="doseValueEdit">
+      </div>
+      
+      <div class="form-group">
+        <label>劑量單位</label>
+        <input type="text" id="doseUnitEdit">
+      </div>
+      
+      <div class="form-group">
+        <label>每日服用次數</label>
+        <input type="number" id="frequencyEdit">
+      </div>
+      
+      <div class="form-group">
+        <label>服用天數</label>
+        <input type="number" id="daysEdit">
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label>額外指示 / 備註</label>
+      <input type="text" id="medNoteEdit">
+    </div>
+    
+    <!-- 按鈕容器，將修改和刪除按鈕放在同一行 -->
+    <div class="button-group">
+      <button class="btn" onclick="updateMedicationRequest()">
+        ✏️ 確認修改並重新送審
+      </button>
+      <button class="btn btn-danger" onclick="deleteMedicationRequest()">
+        🗑️ 刪除處方
+      </button>
+    </div>
+  </div>
+
+  <!-- 建立 ServiceRequest -->
+  <div class="form-box" id="srCreate">
+    <h2>建立藥品配送</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>關聯病人</label>
+        <select id="srPatientSelect">
+          <option value="">-- 請選擇病人 --</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>藥物處方</label>
+        <div class="select-with-refresh">
+          <select id="medRequestSelect">
+            <option value="">-- 請選擇處方 --</option>
+          </select>
+          <button class="refresh-btn" onclick="refreshMedicationRequests('delivery')">
+            🔄
+          </button>
+        </div>
+      </div>
+      
+      <!-- 修改後的藥師選擇區域 - 總是使用下拉選單 -->
+      <div class="form-group">
+        <label>配送藥師</label>
+        <select id="pharmacistSelect">
+          <option value="">-- 請選擇藥師 --</option>
+        </select>
+        <div id="pharmacistHint" class="pharmacist-hint" style="display: none;">
+          💡 此處方已指定藥師，您可以選擇其他藥師或保持原選擇
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>配送備註</label>
+        <input type="text" id="orderNote" placeholder="配送特殊要求或注意事項">
+      </div>
+    </div>
+    
+    <button class="btn" type="button" onclick="createServiceRequest()">
+      🚚 建立配送請求
+    </button>
+  </div>
+
+  <!-- 醫師通知中心 -->
+  <div class="form-box" id="notification">
+    <h2>醫師審核通知中心</h2>
+    <button class="btn" onclick="loadCommunications(this)">
+      🔄 刷新通知
+    </button>
+    
+    <div class="card">
+      <table id="commTable">
+        <thead>
+          <tr>
+            <th>訊息來源</th>
+            <th>內容</th>
+            <th>時間</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- JSON Modal -->
+<div id="jsonModal" class="modal">
+  <div class="modal-content">
+    <h3>完整 JSON 資料</h3>
+    <pre id="jsonContent"></pre>
+    <button class="btn btn-secondary" onclick="closeJson()">關閉</button>
+  </div>
+</div>
+
+<script>
+const fhirServerUrl = "http://203.64.84.209:8080/fhir";
+let currentPractitioner = null;
+let allPharmacists = [];
+
+// -------------------- 顯示錯誤訊息 --------------------
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('errorMessage').style.display = 'none';
+}
+
+// -------------------- 顯示成功訊息 --------------------
+function showSuccessMessage(message) {
+  // 移除現有的成功訊息
+  const existingMsg = document.querySelector('.success-message');
+  if (existingMsg) existingMsg.remove();
+  
+  // 創建新的成功訊息
+  const successDiv = document.createElement('div');
+  successDiv.className = 'success-message';
+  successDiv.textContent = message;
+  document.body.appendChild(successDiv);
+  
+  // 3秒後自動移除
+  setTimeout(() => {
+    successDiv.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => successDiv.remove(), 300);
+  }, 3000);
+}
+
+// -------------------- Tab 切換 --------------------
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.addEventListener("click",()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    const target = tab.dataset.target;
+    document.querySelectorAll(".form-box").forEach(fb=>fb.classList.remove("active"));
+    document.getElementById(target).classList.add("active");
+  });
+});
+
+// -------------------- 從 cookie 取值 --------------------
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+// -------------------- 登出功能 --------------------
+function logout() {
+  // 清除所有相關的 cookie
+  const cookies = document.cookie.split(";");
+  
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i];
+    const eqPos = cookie.indexOf("=");
+    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+    
+    // 清除所有可能的認證相關 cookie
+    if (name === "token" || name === "selectedRole") {
+      document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+  }
+  
+  // 強制重新導向到登入頁面
+  window.location.href = "/login.html";
+}
+
+// -------------------- 刷新處方列表 --------------------
+function refreshMedicationRequests(type) {
+  let patientSelect, targetSelect, statusFilter;
+  
+  if (type === 'edit') {
+    patientSelect = document.getElementById("patientSelectEdit");
+    targetSelect = "medEditSelect";
+    statusFilter = "on-hold";
+  } else if (type === 'delivery') {
+    patientSelect = document.getElementById("srPatientSelect");
+    targetSelect = "medRequestSelect";
+    statusFilter = "active";
+  }
+  
+  const patientId = patientSelect.value;
+  
+  if (!patientId) {
+    alert("請先選擇病人");
+    return;
+  }
+  
+  // 顯示載入狀態
+  const button = event.target;
+  const originalText = button.innerHTML;
+  button.innerHTML = '<span class="loading"></span>';
+  button.disabled = true;
+  
+  // 重新載入處方列表
+  loadMedRequests(patientId, targetSelect, statusFilter);
+  
+  // 恢復按鈕狀態
+  setTimeout(() => {
+    button.innerHTML = originalText;
+    button.disabled = false;
+  }, 1000);
+}
+
+// -------------------- 自動帶入修改處方欄位 --------------------
+document.getElementById("medEditSelect").addEventListener("change", async function() {
+  const medId = this.value;
+  
+  if (!medId) {
+    // 清空表單
+    clearEditForm();
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${fhirServerUrl}/MedicationRequest/${medId}`);
+    if (!res.ok) {
+      throw new Error("無法取得處方資料");
+    }
+    
+    const med = await res.json();
+    
+    // 填充表單
+    document.getElementById("medNameEdit").value = med.medicationCodeableConcept?.text || "";
+    
+    const doseInfo = med.dosageInstruction?.[0]?.doseAndRate?.[0]?.doseQuantity;
+    document.getElementById("doseValueEdit").value = doseInfo?.value || "";
+    document.getElementById("doseUnitEdit").value = doseInfo?.unit || "";
+    
+    document.getElementById("frequencyEdit").value = med.dosageInstruction?.[0]?.timing?.repeat?.frequency || "";
+    document.getElementById("daysEdit").value = med.dispenseRequest?.expectedSupplyDuration?.value || "";
+    document.getElementById("medNoteEdit").value = med.note?.[0]?.text || "";
+    
+  } catch (err) { 
+    console.error("載入處方詳細資料失敗:", err);
+    
+    // 顯示錯誤訊息但不中斷使用者操作
+    const errorMsg = "無法載入處方詳細資料，請檢查網路或重新整理列表";
+    const existingError = document.querySelector('#medEdit .warning-message');
+    
+    if (!existingError) {
+      const warningDiv = document.createElement('div');
+      warningDiv.className = 'warning-message';
+      warningDiv.textContent = errorMsg;
+      document.querySelector('#medEdit .button-group').before(warningDiv);
+      
+      // 3秒後自動移除警告
+      setTimeout(() => {
+        if (warningDiv.parentNode) {
+          warningDiv.style.opacity = '0';
+          setTimeout(() => warningDiv.remove(), 300);
+        }
+      }, 3000);
+    }
+  }
+});
+
+// -------------------- 清空修改表單 --------------------
+function clearEditForm() {
+  document.getElementById("medNameEdit").value = "";
+  document.getElementById("doseValueEdit").value = "";
+  document.getElementById("doseUnitEdit").value = "";
+  document.getElementById("frequencyEdit").value = "";
+  document.getElementById("daysEdit").value = "";
+  document.getElementById("medNoteEdit").value = "";
+}
+
+// -------------------- 載入登入醫師角色（從 cookie） --------------------
+async function loadCurrentUser() {
+  try {
+    // 檢查 selectedRole
+    const roleCookie = getCookie("selectedRole");
+    console.log("Role Cookie:", roleCookie);
+    
+    if (!roleCookie) {
+      showError("尚未選擇角色，請重新登入");
+      setTimeout(() => {
+        window.location.href = "/choose-organization.html";
+      }, 2000);
+      return;
+    }
+
+    let selectedRole;
+    try {
+      selectedRole = JSON.parse(roleCookie);
+    } catch (e) {
+      console.error("解析角色 cookie 失敗:", e);
+      showError("角色資料格式錯誤，請重新選擇角色");
+      window.location.href = "/choose-organization.html";
+      return;
+    }
+
+    if (!selectedRole || !selectedRole.organizationId || !selectedRole.practitionerId) {
+      showError("角色資料不完整，請重新選擇");
+      window.location.href = "/choose-organization.html";
+      return;
+    }
+
+    // 設定目前醫師資料
+    currentPractitioner = {
+      practitionerId: selectedRole.practitionerId,
+      practitionerRoleId: selectedRole.practitionerRoleId,
+      organizationId: selectedRole.organizationId,
+      roleType: selectedRole.roleType,
+      organizationName: selectedRole.organizationName,
+      jobTitle: selectedRole.jobTitle
+    };
+
+    console.log("👨‍⚕️ 當前登入醫師：", currentPractitioner);
+
+    // 更新頁面顯示的使用者資訊
+    await updateUserInfoDisplay();
+
+    // 隱藏錯誤訊息
+    hideError();
+
+    // 載入對應醫院的病人與藥師
+    await loadPatients();
+    await loadPharmacists();
+
+  } catch (err) {
+    console.error("載入角色失敗:", err);
+    showError("角色載入失敗: " + err.message);
+  }
+}
+
+// -------------------- 更新頁面使用者資訊顯示 --------------------
+async function updateUserInfoDisplay() {
+  if (!currentPractitioner) return;
+  
+  // 獲取機構名稱 - 直接使用中文名稱
+  let orgName = "未知機構";
+  
+  // 如果 organizationName 是 "Organization/tzuch" 格式，提取機構ID
+  if (currentPractitioner.organizationName && currentPractitioner.organizationName.startsWith('Organization/')) {
+    const orgId = currentPractitioner.organizationName.replace('Organization/', '');
+    
+    // 嘗試從 FHIR 伺服器獲取機構的詳細資訊
+    try {
+      const orgRes = await fetch(`${fhirServerUrl}/Organization/${orgId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgName = orgData.name || orgId; // 使用機構的真實名稱
+      } else {
+        // 如果無法獲取機構詳情，使用機構ID
+        orgName = orgId;
+      }
+    } catch (err) {
+      console.error("獲取機構名稱失敗:", err);
+      orgName = orgId; // 使用機構ID作為備用
+    }
+  } else if (currentPractitioner.organizationName) {
+    // 如果已經有機構名稱，直接使用
+    orgName = currentPractitioner.organizationName;
+  } else if (currentPractitioner.organizationId) {
+    // 只有機構ID，嘗試獲取機構詳情
+    try {
+      const orgRes = await fetch(`${fhirServerUrl}/Organization/${currentPractitioner.organizationId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgName = orgData.name || currentPractitioner.organizationId;
+      } else {
+        orgName = currentPractitioner.organizationId;
+      }
+    } catch (err) {
+      console.error("獲取機構名稱失敗:", err);
+      orgName = currentPractitioner.organizationId;
+    }
+  }
+  
+  // 獲取醫師名稱
+  let doctorName = "未知醫師";
+  try {
+    const pracRes = await fetch(`${fhirServerUrl}/Practitioner/${currentPractitioner.practitionerId}`);
+    if (pracRes.ok) {
+      const practitioner = await pracRes.json();
+      if (practitioner.name && practitioner.name[0]) {
+        const name = practitioner.name[0];
+        if (name.text) {
+          doctorName = name.text;
+        } else {
+          // 組合姓名
+          const family = name.family || '';
+          const given = name.given ? name.given.join(' ') : '';
+          doctorName = `${family} ${given}`.trim();
+        }
+      }
+    }
+  } catch (err) {
+    console.error("獲取醫師名稱失敗:", err);
+  }
+  
+  // 更新顯示 - 直接顯示機構名稱，不添加前綴
+  document.getElementById("currentOrganization").textContent = orgName;
+  document.getElementById("currentUser").textContent = `${doctorName} (${currentPractitioner.jobTitle || '醫師'})`;
+}
+
+// -------------------- 載入病人 --------------------
+async function loadPatients() {
+  if (!currentPractitioner?.organizationId) return;
+  try {
+    const res = await fetch(`${fhirServerUrl}/Patient?organization=${currentPractitioner.organizationId}`);
+    const bundle = await res.json();
+
+    const selects = ["patientSelect", "srPatientSelect", "patientSelectEdit"];
+    selects.forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">-- 請選擇病人 --</option>';
+      bundle.entry?.forEach(e => {
+        const p = e.resource;
+        const name = p.name?.[0]?.text || 
+                    `${p.name?.[0]?.family || ''}${p.name?.[0]?.given?.[0] || ''}`.trim() || 
+                    `病人 ${p.id}`;
+        sel.appendChild(new Option(`${name} (${p.id})`, p.id));
+      });
+    });
+  } catch (err) {
+    console.error("載入病人失敗:", err);
+    showError("載入病人列表失敗，請稍後重試");
+  }
+}
+
+// -------------------- 載入藥師 --------------------
+async function loadPharmacists() {
+  if (!currentPractitioner?.organizationId) return;
+  try {
+    const res = await fetch(`${fhirServerUrl}/PractitionerRole?organization=${currentPractitioner.organizationId}`);
+    const bundle = await res.json();
+
+    const selectIds = ["pharmacistSelect", "medPharmacistSelect"];
+    selectIds.forEach(selId => {
+      const sel = document.getElementById(selId);
+      sel.innerHTML = '<option value="">-- 請選擇藥師 --</option>';
+    });
+
+    allPharmacists = [];
+
+    for (const e of bundle.entry || []) {
+      const role = e.resource;
+
+      // role 是藥師才顯示
+      const isPharmacist = Array.isArray(role.code) && role.code.some(c =>
+        /藥師|Pharmacist/i.test(c.text || "") ||
+        (Array.isArray(c.coding) && c.coding.some(cd => /藥師|Pharmacist/i.test(cd.display || cd.code || "")))
+      );
+      if (!isPharmacist) continue;
+
+      const ref = role.practitioner?.reference;
+      if (!ref) continue;
+
+      // 取得藥師名稱
+      let displayName = ref;
+      let pharmacistId = ref.replace("Practitioner/", "");
+      try {
+        const pracRes = await fetch(`${fhirServerUrl}/${ref}`);
+        if (pracRes.ok) {
+          const prac = await pracRes.json();
+          if (prac.name && prac.name[0]) {
+            const name = prac.name[0];
+            if (name.text) {
+              displayName = name.text;
+            } else {
+              // 組合姓名
+              const family = name.family || '';
+              const given = name.given ? name.given.join(' ') : '';
+              displayName = `${family} ${given}`.trim();
+            }
+          }
+        }
+      } catch (err) {
+        console.error("載入藥師名稱失敗:", ref, err);
+      }
+
+      // 儲存藥師資料
+      allPharmacists.push({
+        id: pharmacistId,
+        reference: ref,
+        name: displayName
+      });
+
+      // 加入到下拉選單
+      selectIds.forEach(selId => {
+        const sel = document.getElementById(selId);
+        sel.appendChild(new Option(`${displayName} (${pharmacistId})`, ref));
+      });
+    }
+  } catch (err) {
+    console.error("載入藥師失敗:", err);
+    showError("載入藥師列表失敗，請稍後重試");
+  }
+}
+
+// -------------------- 載入 MedicationRequest --------------------
+async function loadMedRequests(patientId, targetSelectId="medRequestSelect", statusFilter="active") {
+  const select = document.getElementById(targetSelectId);
+  select.innerHTML = '<option value="">-- 請先選擇處方 --</option>';
+  
+  if (!patientId || !currentPractitioner) return;
+  
+  try {
+    // 載入所有 ServiceRequest 來檢查哪些 MedicationRequest 已被連結
+    const srRes = await fetch(`${fhirServerUrl}/ServiceRequest`);
+    const srBundle = await srRes.json();
+    
+    // 建立已連結的 MedicationRequest ID 集合
+    const linkedMedIds = new Set();
+    if (srBundle.entry) {
+      srBundle.entry.forEach(entry => {
+        const sr = entry.resource;
+        if (sr.basedOn) {
+          sr.basedOn.forEach(basedOn => {
+            if (basedOn.reference && basedOn.reference.startsWith('MedicationRequest/')) {
+              linkedMedIds.add(basedOn.reference.replace('MedicationRequest/', ''));
+            }
+          });
+        }
+      });
+    }
+    
+    // 只載入當前醫師為該病人建立的處方
+    const url = `${fhirServerUrl}/MedicationRequest?subject=Patient/${patientId}&status=${statusFilter}&requester=Practitioner/${currentPractitioner.practitionerId}`;
+    const res = await fetch(url);
+    const bundle = await res.json();
+    
+    let availableMeds = 0;
+    
+    if (bundle.entry) {
+      bundle.entry.forEach(e => {
+        const med = e.resource;
+        
+        // 如果這是配送頁面，跳過已連結的 MedicationRequest
+        if (targetSelectId === "medRequestSelect" && linkedMedIds.has(med.id)) {
+          return;
+        }
+        
+        const name = med.medicationCodeableConcept?.text || med.id;
+        const date = med.authoredOn ? new Date(med.authoredOn).toLocaleString() : "";
+        select.appendChild(new Option(`${name} (${date})`, med.id));
+        availableMeds++;
+      });
+    }
+    
+    // 如果沒有找到處方，顯示提示
+    if (availableMeds === 0) {
+      if (targetSelectId === "medRequestSelect") {
+        select.innerHTML = '<option value="">-- 您尚未為此病人建立處方，或所有處方都已建立配送 --</option>';
+      } else {
+        select.innerHTML = '<option value="">-- 您尚未為此病人建立處方 --</option>';
+      }
+    }
+  } catch (err) {
+    console.error("載入處方失敗:", err);
+    select.innerHTML = '<option value="">-- 載入處方失敗 --</option>';
+  }
+}
+
+// -------------------- 建立 MedicationRequest（已移除備註） --------------------
+function createMedicationRequest() {
+  const patientId = document.getElementById("patientSelect").value.trim();
+  const medName = document.getElementById("medName").value.trim();
+  const medCode = document.getElementById("medCode").value.trim();
+  const doseValue = parseFloat(document.getElementById("doseValue").value);
+  const doseUnit = document.getElementById("doseUnit").value.trim();
+  const frequency = parseInt(document.getElementById("frequency").value);
+  const days = parseInt(document.getElementById("days").value);
+  const selectedPharmacist = document.getElementById("medPharmacistSelect").value;
+  
+  if (!patientId || !medName || !medCode || !doseValue || !doseUnit || !frequency || !days) { 
+    alert("請填寫所有必填欄位"); 
+    return; 
+  }
+
+  // 顯示載入狀態
+  const button = event.target;
+  const originalText = button.innerHTML;
+  button.innerHTML = '<span class="loading"></span>送出中...';
+  button.disabled = true;
+
+  // 確保 requester 正確設定為當前醫師
+  const medRequest = {
+    resourceType: "MedicationRequest",
+    status: "active",
+    intent: "order",
+    medicationCodeableConcept: {
+      coding: [{
+        system: "http://www.nlm.nih.gov/research/umls/rxnorm", 
+        code: medCode, 
+        display: medName
+      }], 
+      text: medName
+    },
+    subject: { reference: "Patient/" + patientId },
+    authoredOn: new Date().toISOString(),
+    requester: { 
+      reference: `Practitioner/${currentPractitioner.practitionerId}`,
+      display: document.getElementById("currentUser").textContent
+    },
+    dosageInstruction: [{
+      text: `口服，每日${frequency}次，每次 ${doseValue} ${doseUnit}`,
+      timing: {
+        repeat: {
+          frequency: frequency,
+          period: 1,
+          periodUnit: "d"
+        }
+      },
+      route: {
+        coding: [{
+          system: "http://terminology.hl7.org/CodeSystem/route-codes",
+          code: "PO",
+          display: "口服"
+        }]
+      },
+      doseAndRate: [{
+        doseQuantity: {
+          value: doseValue,
+          unit: doseUnit,
+          system: "http://unitsofmeasure.org",
+          code: doseUnit
+        }
+      }]
+    }],
+    dispenseRequest: {
+      numberOfRepeatsAllowed: 0,
+      quantity: {
+        value: doseValue * frequency * days,
+        unit: doseUnit,
+        system: "http://unitsofmeasure.org",
+        code: doseUnit
+      },
+      expectedSupplyDuration: {
+        value: days,
+        unit: "days",
+        system: "http://unitsofmeasure.org",
+        code: "d"
+      }
+    }
+  };
+  
+  if (selectedPharmacist) medRequest.performer = { reference: selectedPharmacist };
+  
+  fetch(`${fhirServerUrl}/MedicationRequest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/fhir+json; charset=UTF-8" },
+    body: JSON.stringify(medRequest)
+  })
+  .then(res => res.ok ? res.json() : Promise.reject("HTTP error " + res.status))
+  .then(data => { 
+    alert("MedicationRequest 已送出，ID:" + data.id); 
+    // 清空表單
+    document.getElementById("medName").value = "";
+    document.getElementById("medCode").value = "";
+    document.getElementById("doseValue").value = "";
+    document.getElementById("doseUnit").value = "";
+    document.getElementById("frequency").value = "";
+    document.getElementById("days").value = "";
+    
+    // 重新載入處方列表
+    loadMedRequests(patientId, "medRequestSelect", "active");
+  })
+  .catch(err => { 
+    alert("送出失敗：" + err); 
+    console.error(err); 
+  })
+  .finally(() => {
+    // 恢復按鈕狀態
+    button.innerHTML = originalText;
+    button.disabled = false;
+  });
+}
+
+// -------------------- 修改 MedicationRequest --------------------
+async function updateMedicationRequest() {
+  const medId = document.getElementById("medEditSelect").value;
+  if (!medId) { 
+    alert("請選擇處方"); 
+    return; 
+  }
+  
+  // 顯示載入狀態
+  const button = event.target;
+  const originalText = button.innerHTML;
+  button.innerHTML = '<span class="loading"></span>修改中...';
+  button.disabled = true;
+
+  try {
+    // 首先檢查這個處方是否屬於當前醫師
+    const res = await fetch(`${fhirServerUrl}/MedicationRequest/${medId}`);
+    const med = await res.json();
+    
+    // 檢查處方的 requester 是否匹配當前醫師
+    const requesterRef = med.requester?.reference;
+    if (requesterRef !== `Practitioner/${currentPractitioner.practitionerId}`) {
+      alert("您只能修改自己建立的處方");
+      return;
+    }
+    
+    // 更新處方內容
+    med.medicationCodeableConcept.text = document.getElementById("medNameEdit").value;
+    med.dosageInstruction[0].doseAndRate[0].doseQuantity.value = parseFloat(document.getElementById("doseValueEdit").value);
+    med.dosageInstruction[0].doseAndRate[0].doseQuantity.unit = document.getElementById("doseUnitEdit").value;
+    med.dosageInstruction[0].timing.repeat.frequency = parseInt(document.getElementById("frequencyEdit").value);
+    med.dispenseRequest.quantity.value = parseFloat(document.getElementById("doseValueEdit").value) * parseInt(document.getElementById("frequencyEdit").value) * parseInt(document.getElementById("daysEdit").value);
+    med.dispenseRequest.expectedSupplyDuration.value = parseInt(document.getElementById("daysEdit").value);
+    med.note = [{ text: document.getElementById("medNoteEdit").value }];
+    med.status = "active"; // ✅ 修改後狀態改回 active
+    
+    const putRes = await fetch(`${fhirServerUrl}/MedicationRequest/${medId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/fhir+json" },
+      body: JSON.stringify(med)
+    });
+    
+    if (putRes.ok) {
+      alert("MedicationRequest 已修改並重新送審");
+      // 重新載入處方列表
+      const patientId = document.getElementById("patientSelectEdit").value;
+      if (patientId) {
+        loadMedRequests(patientId, "medEditSelect", "on-hold");
+      }
+    } else {
+      throw new Error("更新失敗");
+    }
+  } catch (err) { 
+    console.error(err); 
+    alert("修改失敗：" + err); 
+  } finally {
+    button.innerHTML = originalText;
+    button.disabled = false;
+  }
+}
+
+// -------------------- 刪除 MedicationRequest --------------------
+async function deleteMedicationRequest() {
+  const medId = document.getElementById("medEditSelect").value;
+  const patientId = document.getElementById("patientSelectEdit").value;
+  
+  if (!medId) { 
+    alert("請先選擇要刪除的處方"); 
+    return; 
+  }
+  
+  // 顯示刪除確認對話框
+  showDeleteConfirmation(medId, patientId);
+}
+
+// -------------------- 顯示刪除確認對話框 --------------------
+function showDeleteConfirmation(medId, patientId) {
+  // 創建模態框
+  const modal = document.createElement('div');
+  modal.className = 'modal delete-confirm-modal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h3>⚠️ 確認刪除處方</h3>
+      <p>您確定要刪除這個處方嗎？這個操作無法復原。</p>
+      <div class="modal-buttons">
+        <button class="btn" onclick="confirmDeleteMedicationRequest('${medId}', '${patientId}', this)">確認刪除</button>
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">取消</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  modal.style.display = 'flex';
+}
+
+// -------------------- 關閉刪除確認模態框 --------------------
+function closeDeleteModal() {
+  const modal = document.querySelector('.delete-confirm-modal');
+  if (modal) {
+    modal.style.animation = 'modalFadeIn 0.3s ease reverse';
+    setTimeout(() => modal.remove(), 300);
+  }
+}
+
+// -------------------- 確認刪除 MedicationRequest --------------------
+async function confirmDeleteMedicationRequest(medId, patientId, buttonElement) {
+  if (!currentPractitioner) {
+    alert("無法確認使用者身份，請重新登入");
+    closeDeleteModal();
+    return;
+  }
+  
+  // 顯示載入狀態
+  const button = buttonElement;
+  const originalText = button.innerHTML;
+  button.innerHTML = '<span class="loading"></span>刪除中...';
+  button.disabled = true;
+  
+  try {
+    // 首先檢查這個處方是否屬於當前醫師
+    const res = await fetch(`${fhirServerUrl}/MedicationRequest/${medId}`);
+    if (!res.ok) {
+      throw new Error("找不到指定的處方");
+    }
+    
+    const med = await res.json();
+    
+    // 檢查處方的 requester 是否匹配當前醫師
+    const requesterRef = med.requester?.reference;
+    if (requesterRef !== `Practitioner/${currentPractitioner.practitionerId}`) {
+      alert("您只能刪除自己建立的處方");
+      closeDeleteModal();
+      return;
+    }
+    
+    // 檢查處方是否已被用來建立配送
+    try {
+      const srRes = await fetch(`${fhirServerUrl}/ServiceRequest?basedOn=MedicationRequest/${medId}`);
+      if (srRes.ok) {
+        const srBundle = await srRes.json();
+        if (srBundle.entry && srBundle.entry.length > 0) {
+          // 有關聯的配送請求，不能直接刪除
+          alert("此處方已被用於建立配送請求，無法刪除。請先刪除相關的配送請求。");
+          closeDeleteModal();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("檢查關聯配送請求時發生錯誤:", err);
+      // 繼續執行刪除，但顯示警告
+      if (!confirm("無法確認處方是否有關聯的配送請求，您確定要繼續刪除嗎？")) {
+        closeDeleteModal();
+        return;
+      }
+    }
+    
+    // 執行刪除操作
+    const deleteRes = await fetch(`${fhirServerUrl}/MedicationRequest/${medId}`, {
+      method: 'DELETE',
+      headers: { 
+        'Content-Type': 'application/fhir+json'
+      }
+    });
+    
+    if (deleteRes.ok || deleteRes.status === 204) {
+      // 刪除成功
+      showSuccessMessage('處方刪除成功');
+      
+      // 清空表單
+      clearEditForm();
+      
+      // 重新載入處方列表
+      if (patientId) {
+        loadMedRequests(patientId, "medEditSelect", "on-hold");
+      }
+      
+      // 關閉模態框
+      closeDeleteModal();
+      
+    } else {
+      // 如果DELETE方法不被支持，嘗試更新狀態為"entered-in-error"
+      await deleteMedicationRequestAlternative(med);
+    }
+    
+  } catch (err) { 
+    console.error("刪除處方失敗:", err); 
+    alert("刪除失敗：" + err.message); 
+    
+    // 關閉模態框
+    closeDeleteModal();
+  } finally {
+    // 恢復按鈕狀態
+    button.innerHTML = originalText;
+    button.disabled = false;
+  }
+}
+
+// -------------------- 替代刪除方法：更新狀態為 entered-in-error --------------------
+async function deleteMedicationRequestAlternative(med) {
+  try {
+    // 更新狀態為 entered-in-error（表示處方有誤需廢棄）
+    med.status = "entered-in-error";
+    
+    const updateRes = await fetch(`${fhirServerUrl}/MedicationRequest/${med.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/fhir+json" },
+      body: JSON.stringify(med)
+    });
+    
+    if (updateRes.ok) {
+      showSuccessMessage('處方已標記為作廢（因技術限制無法直接刪除）');
+      
+      // 清空表單
+      clearEditForm();
+      
+      // 重新載入處方列表
+      const patientId = document.getElementById("patientSelectEdit").value;
+      if (patientId) {
+        loadMedRequests(patientId, "medEditSelect", "on-hold");
+      }
+      
+      // 關閉模態框
+      closeDeleteModal();
+    } else {
+      throw new Error("更新狀態失敗");
+    }
+  } catch (err) {
+    throw err;
+  }
+}
+
+// -------------------- 建立 ServiceRequest --------------------
+function createServiceRequest(){
+  const patientId=document.getElementById("srPatientSelect").value;
+  const medId=document.getElementById("medRequestSelect").value;
+  const pharmacistRef=document.getElementById("pharmacistSelect").value;
+  const noteText=document.getElementById("orderNote").value;
+  
+  if(!patientId||!medId){ 
+    alert("請選擇病人與處方"); 
+    return; 
+  }
+
+  // 顯示載入狀態
+  const button = event.target;
+  const originalText = button.innerHTML;
+  button.innerHTML = '<span class="loading"></span>送出中...';
+  button.disabled = true;
+
+  fetch(`${fhirServerUrl}/MedicationRequest/${medId}`).then(r=>r.json()).then(med=>{
+    if(med.status!=="active"){ 
+      alert("處方必須為 active 才能建立配送"); 
+      button.innerHTML = originalText;
+      button.disabled = false;
+      return; 
+    }
+
+    const sr={
+      resourceType:"ServiceRequest",
+      status:"active",
+      intent:"order",
+      subject:{reference:"Patient/"+patientId},
+      authoredOn:new Date().toISOString(),
+      requester:{reference:`Practitioner/${currentPractitioner.practitionerId}`},
+      code:{text:med.medicationCodeableConcept?.text || ""},
+      note:[{text:noteText}],
+      basedOn:[{reference:`MedicationRequest/${medId}`}]
+    };
+    
+    // 使用藥師選擇區域的值
+    const selectedPharmacistRef = document.getElementById("pharmacistSelect").value;
+    if(selectedPharmacistRef) sr.performer=[{reference:selectedPharmacistRef}];
+    
+    fetch(`${fhirServerUrl}/ServiceRequest`,{
+      method:"POST", 
+      headers:{"Content-Type":"application/fhir+json"}, 
+      body:JSON.stringify(sr)
+    })
+      .then(res=>res.ok?res.json():Promise.reject("HTTP error "+res.status))
+      .then(data=>{ 
+        alert("ServiceRequest 已送出，ID:"+data.id); 
+        // 清空表單
+        document.getElementById("orderNote").value = "";
+      })
+      .catch(err=>{ 
+        alert("送出失敗："+err); 
+        console.error(err); 
+      })
+      .finally(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+      });
+  }).catch(err=>{
+    console.error(err);
+    button.innerHTML = originalText;
+    button.disabled = false;
+  });
+}
+
+// -------------------- 監聽藥物處方選擇事件（修改版） --------------------
+document.getElementById("medRequestSelect").addEventListener("change", async function() {
+  const medId = this.value;
+  const pharmacistSelect = document.getElementById("pharmacistSelect");
+  const pharmacistHint = document.getElementById("pharmacistHint");
+  
+  // 重置藥師選擇
+  pharmacistSelect.value = "";
+  pharmacistHint.style.display = "none";
+  
+  if (!medId) return;
+  
+  try {
+    // 取得 MedicationRequest 詳細資料
+    const res = await fetch(`${fhirServerUrl}/MedicationRequest/${medId}`);
+    const med = await res.json();
+    
+    // 檢查是否有指定的藥師
+    const performerRef = med.performer?.reference;
+    
+    if (performerRef) {
+      // 有指定藥師，設定下拉選單的預設值並顯示提示
+      pharmacistSelect.value = performerRef;
+      pharmacistHint.style.display = "block";
+    }
+    // 如果沒有指定藥師，下拉選單保持空白，讓使用者選擇
+  } catch (err) {
+    console.error("取得 MedicationRequest 失敗:", err);
+  }
+});
+
+// 監聽病人選擇，載入對應的處方
+document.getElementById("patientSelect").addEventListener("change", () => loadMedRequests(document.getElementById("patientSelect").value, "medRequestSelect", "active"));
+
+document.getElementById("srPatientSelect").addEventListener("change", () => loadMedRequests(document.getElementById("srPatientSelect").value, "medRequestSelect", "active"));
+
+document.getElementById("patientSelectEdit").addEventListener("change", () => loadMedRequests(document.getElementById("patientSelectEdit").value, "medEditSelect", "on-hold"));
+
+// -------------------- 醫師通知中心 - 修正版 --------------------
+async function loadCommunications(buttonElement) {
+  if(!currentPractitioner) return;
+  
+  // 顯示載入狀態（如果有按鈕元素）
+  let originalText;
+  if (buttonElement) {
+    originalText = buttonElement.innerHTML;
+    buttonElement.innerHTML = '<span class="loading"></span>載入中...';
+    buttonElement.disabled = true;
+  }
+
+  const practitionerRef=`Practitioner/${currentPractitioner.practitionerId}`;
+  const tableBody=document.querySelector("#commTable tbody");
+  tableBody.innerHTML="";
+  try{
+    const res=await fetch(`${fhirServerUrl}/Communication?recipient=${practitionerRef}&_sort=-sent`);
+    if(!res.ok) throw new Error("FHIR API error "+res.status);
+    const bundle=await res.json();
+    if(!bundle.entry || bundle.entry.length===0){
+      tableBody.innerHTML='<tr><td colspan="4">沒有通知</td></tr>';
+      return;
+    }
+    for(const e of bundle.entry){
+      const comm=e.resource;
+      let senderName=comm.sender?.display || comm.sender?.reference || "";
+      if(comm.sender?.reference?.startsWith("Practitioner/")){
+        try{
+          const sRes=await fetch(`${fhirServerUrl}/${comm.sender.reference}`);
+          if(sRes.ok){
+            const sData=await sRes.json();
+            if (sData.name && sData.name[0]) {
+              const name = sData.name[0];
+              if (name.text) {
+                senderName = name.text;
+              } else {
+                // 組合姓名
+                const family = name.family || '';
+                const given = name.given ? name.given.join(' ') : '';
+                senderName = `${family} ${given}`.trim();
+              }
+            }
+          }
+        }catch(err){console.error(err);}
+      }
+      const content=comm.payload?.map(p=>p.contentString||"").join("<br>")||"";
+      const sent=comm.sent? new Date(comm.sent).toLocaleString():"";
+      const row=document.createElement("tr");
+      row.innerHTML=`
+        <td>${senderName}</td>
+        <td>${content}</td>
+        <td>${sent}</td>
+        <td>
+          <button class="table-btn primary" onclick="markAsRead('${comm.id}', this)">標記已讀</button>
+          <button class="table-btn secondary" onclick="showJson(${JSON.stringify(comm).replace(/'/g, "\\'")})">查看 JSON</button>
+        </td>`;
+      tableBody.appendChild(row);
+    }
+  }catch(err){ 
+    console.error(err); 
+    tableBody.innerHTML='<tr><td colspan="4">抓取通知失敗</td></tr>'; 
+  }
+  finally {
+    // 恢復按鈕狀態（如果有按鈕元素）
+    if (buttonElement) {
+      buttonElement.innerHTML = originalText;
+      buttonElement.disabled = false;
+    }
+  }
+}
+
+// -------------------- 修正的 markAsRead 函數 --------------------
+async function markAsRead(commId, buttonElement) {
+  console.log('嘗試刪除 Communication:', commId);
+  
+  // 使用傳入的按鈕元素
+  const button = buttonElement;
+  const originalText = button.innerHTML;
+  
+  try {
+    // 禁用按鈕並顯示載入狀態
+    button.innerHTML = '<span class="loading"></span>';
+    button.disabled = true;
+    
+    // 直接對 FHIR 伺服器進行 DELETE 操作
+    const response = await fetch(`${fhirServerUrl}/Communication/${commId}`, {
+      method: 'DELETE',
+      headers: { 
+        'Content-Type': 'application/fhir+json'
+      }
+    });
+    
+    if (response.ok || response.status === 204) {
+      // 成功刪除，從表格中移除該行
+      const row = button.closest('tr');
+      row.style.opacity = '0.5';
+      row.style.backgroundColor = '#f8f9fa';
+      
+      // 等待動畫效果
+      setTimeout(() => {
+        row.remove();
+        
+        // 如果表格空了，顯示提示
+        const tableBody = document.querySelector("#commTable tbody");
+        if (!tableBody.children.length) {
+          tableBody.innerHTML = '<tr><td colspan="4">沒有通知</td></tr>';
+        }
+        
+        // 顯示成功訊息
+        showSuccessMessage('通知已標記為已讀並刪除');
+      }, 300);
+      
+    } else if (response.status === 404) {
+      // 通知不存在或已被刪除
+      alert('通知不存在或已被刪除');
+      // 從表格中移除該行
+      const row = button.closest('tr');
+      row.remove();
+      
+      const tableBody = document.querySelector("#commTable tbody");
+      if (!tableBody.children.length) {
+        tableBody.innerHTML = '<tr><td colspan="4">沒有通知</td></tr>';
+      }
+    } else {
+      // 其他錯誤
+      const errorText = await response.text();
+      console.error('刪除失敗:', response.status, errorText);
+      
+      // 嘗試替代方法：更新狀態而不是刪除
+      try {
+        await markAsReadAlternative(commId, button);
+      } catch (altError) {
+        alert("刪除失敗：" + (errorText || response.statusText));
+      }
+    }
+  } catch (err) {
+    console.error('刪除過程發生錯誤:', err);
+    alert("刪除失敗：" + err.message);
+  } finally {
+    // 恢復按鈕狀態
+    button.innerHTML = originalText;
+    button.disabled = false;
+  }
+}
+
+// -------------------- 替代方法：如果 DELETE 失敗，嘗試更新狀態 --------------------
+async function markAsReadAlternative(commId, button) {
+  try {
+    // 先獲取 Communication
+    const getRes = await fetch(`${fhirServerUrl}/Communication/${commId}`);
+    if (!getRes.ok) {
+      throw new Error('無法取得通知資料');
+    }
+    
+    const communication = await getRes.json();
+    
+    // 更新狀態為已完成
+    communication.status = 'completed';
+    communication.received = new Date().toISOString();
+    
+    // 添加已讀標記
+    const updateRes = await fetch(`${fhirServerUrl}/Communication/${commId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/fhir+json' },
+      body: JSON.stringify(communication)
+    });
+    
+    if (updateRes.ok) {
+      // 從表格中移除該行
+      const row = button.closest('tr');
+      row.style.opacity = '0.5';
+      
+      setTimeout(() => {
+        row.remove();
+        
+        const tableBody = document.querySelector("#commTable tbody");
+        if (!tableBody.children.length) {
+          tableBody.innerHTML = '<tr><td colspan="4">沒有通知</td></tr>';
+        }
+        
+        alert('通知已標記為已讀（狀態已更新）');
+      }, 300);
+    } else {
+      throw new Error('更新狀態失敗');
+    }
+  } catch (err) {
+    throw err;
+  }
+}
+
+function showJson(comm){ 
+  document.getElementById("jsonContent").textContent=JSON.stringify(comm,null,2); 
+  document.getElementById("jsonModal").style.display="flex";
+}
+
+function closeJson(){
+  document.getElementById("jsonModal").style.display="none";
+}
+
+// -------------------- 初始化 --------------------
+window.onload=async ()=>{
+  await loadCurrentUser();
+  loadCommunications(); // 不傳遞按鈕元素，這樣不會顯示載入狀態
+  setInterval(() => {
+    loadCommunications(); // 定時刷新也不傳遞按鈕元素
+  }, 2*60*1000);
+};
+</script>
+
+</body>
+</html>

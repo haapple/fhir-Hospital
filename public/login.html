@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FHIR Person 登入</title>
+  <style>
+    /* 全局 & 背景 */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+    }
+    /* Header */
+    .header { 
+      position: relative; 
+      width: 100%; 
+      padding: 1rem 2rem;
+      display: flex; 
+      justify-content: center; 
+      align-items: center;
+    }
+    .header nav a {
+      padding: 0.5rem 1rem; 
+      border: 1px solid rgba(255,255,255,0.6);
+      border-radius: 20px; 
+      background: rgba(255,255,255,0.15);
+      color: #fff; 
+      text-decoration: none; 
+      transition: background 0.2s;
+      backdrop-filter: blur(5px);
+    }
+    .header nav a:hover { 
+      background: rgba(255,255,255,0.3); 
+      color: #000; 
+    }
+    /* 卡片容器 */
+    .container { 
+      display: flex; 
+      justify-content: center; 
+      align-items: center;
+      height: calc(100% - 120px);
+    }
+    .card {
+      width: 360px; 
+      padding: 2rem; 
+      border-radius: 16px;
+      background: rgba(255,255,255,0.15); 
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .card h2 { 
+      text-align: center; 
+      margin-bottom: 1.5rem; 
+      font-size: 1.6rem; 
+    }
+    /* 表單 */
+    .card form label { 
+      display: block; 
+      margin-bottom: 0.25rem; 
+    }
+    .card form input {
+      width: 100%; 
+      padding: 0.6rem; 
+      margin-bottom: 1rem;
+      border: none; 
+      border-radius: 8px; 
+      background: rgba(255,255,255,0.25);
+      color: #fff; 
+      transition: background 0.2s;
+    }
+    .card form input:focus { 
+      background: rgba(255,255,255,0.35); 
+    }
+    .card form button {
+      width: 100%; 
+      padding: 0.75rem; 
+      border: none; 
+      border-radius: 8px;
+      background: #ff8a65; 
+      color: #fff; 
+      font-weight: 600;
+      cursor: pointer; 
+      transition: background 0.2s, transform 0.2s;
+    }
+    .card form button:hover { 
+      background: #ff7043; 
+      transform: translateY(-2px); 
+    }
+    /* 回傳結果 */
+    #output { 
+      display: none; 
+      margin-top: 1.5rem; 
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.3); 
+      border-radius: 6px; 
+      color: #e0e0e0;
+      white-space: pre-wrap;
+    }
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 強制從伺服器載入頁面，避免 file:// 協議無法帶 Cookie -->
+  <script>
+    if (location.protocol === 'file:') {
+      window.location.href = 'http://localhost:3000/login.html';
+    }
+  </script>
+  <div class="header">
+    <nav>
+      <a href="/register.html">註冊</a>
+      <a href="/forgot.html">忘記密碼</a>
+    </nav>
+  </div>
+  <hr>
+  <div class="container">
+    <div class="card">
+      <h2>FHIR Person 登入系統</h2>
+      <form id="loginForm">
+        <label>帳號（login-id）:</label>
+        <input type="text" id="loginId" required>
+        <label>密碼:</label>
+        <input type="password" id="password" required>
+        <button type="submit" id="submitBtn">登入</button>
+      </form>
+      <pre id="output"></pre>
+    </div>
+  </div>
+  <script>
+    // 登入邏輯
+    document.getElementById('loginForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const output = document.getElementById('output');
+      const submitBtn = document.getElementById('submitBtn');
+      const originalText = submitBtn.innerHTML;
+      
+      // 顯示載入狀態
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="loading"></span> 登入中...';
+      output.style.display = 'none';
+
+      const loginId = document.getElementById('loginId').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!loginId || !password) {
+        output.textContent = '請填寫所有欄位';
+        output.style.display = 'block';
+        output.style.color = '#ff4444';
+        resetButton(submitBtn, originalText);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            loginId: loginId,
+            password: password
+          })
+        });
+
+        const data = await res.json();
+        
+        if (res.ok) {
+          // SUCCESS: 檢查是否為管理員
+          if (data.isAdmin) {
+            output.textContent = '✅ 管理員登入成功！正在導向管理後台...';
+            output.style.display = 'block';
+            output.style.color = '#4CAF50';
+            
+            // 管理員直接跳轉到 Hospital.html
+            setTimeout(() => {
+              window.location.href = '/Hospital.html';
+            }, 1000);
+          } else {
+            // 一般用戶跳轉到角色選擇
+            output.textContent = '✅ 登入成功！正在導向系統...';
+            output.style.display = 'block';
+            output.style.color = '#4CAF50';
+            setTimeout(() => {
+              window.location.href = '/choose-organization.html'; 
+            }, 1000);
+          }
+        } else {
+          // FAILED: Display error message
+          output.textContent = JSON.stringify(data, null, 2);
+          output.style.display = 'block';
+          output.style.color = '#ff4444';
+          resetButton(submitBtn, originalText);
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        output.textContent = '網路錯誤，請檢查連線後再試';
+        output.style.display = 'block';
+        output.style.color = '#ff4444';
+        resetButton(submitBtn, originalText);
+      }
+    });
+
+    function resetButton(button, originalHTML) {
+      button.disabled = false;
+      button.innerHTML = originalHTML;
+    }
+  </script>
+</body>
+</html>

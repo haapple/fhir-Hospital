@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>藥師審核系統 - MedicationRequest</title>
+<style>
+  * { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+  }
+  
+  html, body {
+    height: 100%;
+    font-family: 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #333;
+    line-height: 1.6;
+  }
+
+  .header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .user-info strong {
+    font-size: 1.2rem;
+    color: #667eea;
+    font-weight: 600;
+  }
+
+  .user-info span {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    color: #667eea;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+  }
+
+  .nav-buttons {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .nav-btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .nav-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+
+  .logout-btn {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+
+  .logout-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+  }
+
+  .main-title {
+    text-align: center;
+    color: white;
+    margin: 2rem 0;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    font-size: 2.2rem;
+    font-weight: 300;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto 3rem;
+    padding: 0 1rem;
+  }
+
+  .stats-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    transition: transform 0.3s ease;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-5px);
+  }
+
+  .stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #667eea;
+    margin: 0.5rem 0;
+  }
+
+  .stat-label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .message {
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+    text-align: center;
+    font-weight: 500;
+    backdrop-filter: blur(5px);
+  }
+
+  .error-message {
+    background: rgba(255, 235, 238, 0.9);
+    color: #c62828;
+    border-left: 4px solid #f44336;
+  }
+
+  .success-message {
+    background: rgba(232, 245, 233, 0.9);
+    color: #2e7d32;
+    border-left: 4px solid #4caf50;
+  }
+
+  .info-message {
+    background: rgba(227, 242, 253, 0.9);
+    color: #1565c0;
+    border-left: 4px solid #2196f3;
+  }
+
+  .card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  }
+
+  .card-title {
+    color: #667eea;
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+
+  .btn-success {
+    background: linear-gradient(135deg, #4caf50, #45a049);
+  }
+
+  .btn-success:hover {
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+  }
+
+  .btn-danger {
+    background: linear-gradient(135deg, #f44336, #e53935);
+  }
+
+  .btn-danger:hover {
+    box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+  }
+
+  .btn-communication {
+    background: linear-gradient(135deg, #00bcd4, #0097a7);
+  }
+
+  .btn-communication:hover {
+    box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+  }
+
+  .table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  th, td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  th {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+  }
+
+  tr:hover {
+    background: rgba(102, 126, 234, 0.05);
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    display: inline-block;
+  }
+
+  .status-active {
+    background: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+  }
+
+  .status-completed {
+    background: rgba(33, 150, 243, 0.1);
+    color: #2196f3;
+  }
+
+  .status-on-hold {
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+  }
+
+  .empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .service-request-btn {
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    margin-top: 0.5rem;
+  }
+
+  .service-request-btn:hover {
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4);
+  }
+
+  /* 模態框樣式 */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    backdrop-filter: blur(5px);
+  }
+
+  .modal-content {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 900px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 2001;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e0e0e0;
+  }
+
+  .modal-title {
+    color: #667eea;
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0.5rem;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-close:hover {
+    background: #f5f5f5;
+  }
+
+  /* 通知項目樣式 */
+  .communication-item {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid #00bcd4;
+  }
+
+  .communication-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+
+  .communication-meta {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+  }
+
+  .communication-body {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+  }
+
+  .communication-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .status-completed {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  .status-pending {
+    background: #fff3e0;
+    color: #f57c00;
+  }
+
+  .email-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    font-size: 0.8rem;
+    margin-left: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .header {
+      padding: 1rem;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .user-info {
+      flex-direction: column;
+      gap: 0.5rem;
+      text-align: center;
+    }
+    
+    .nav-buttons {
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    .nav-btn, .logout-btn {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .card {
+      padding: 1.5rem;
+    }
+    
+    .main-title {
+      font-size: 1.8rem;
+      margin: 1.5rem 0;
+    }
+    
+    .card-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    
+    .action-buttons {
+      flex-direction: column;
+    }
+    
+    .action-btn {
+      min-width: 100%;
+    }
+    
+    th, td {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .modal-content {
+      width: 95%;
+      padding: 1.5rem;
+    }
+    
+    .stats-container {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="user-info">
+    <strong>💊 藥師審核系統 - MedicationRequest</strong>
+    <span id="currentOrganization">載入中...</span>
+    <span id="currentUser">載入中...</span>
+  </div>
+  <div class="nav-buttons">
+    <a href="pharmacist-service.html" class="nav-btn">🚚 前往 ServiceRequest 頁面</a>
+    <button class="logout-btn" onclick="logout()">登出系統</button>
+  </div>
+</div>
+
+<h1 class="main-title">MedicationRequest 審核系統</h1>
+
+<div class="container">
+  <!-- 統計資訊 -->
+  <div class="stats-container">
+    <div class="stat-card">
+      <div class="stat-label">待審核處方</div>
+      <div class="stat-number" id="pendingMedCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">已通過處方</div>
+      <div class="stat-number" id="completedMedCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">待處理 ServiceRequest</div>
+      <div class="stat-number" id="pendingSRCount">0</div>
+    </div>
+    <!-- 新增：通知功能卡片 -->
+    <div class="stat-card">
+      <div class="stat-label">通知功能</div>
+      <button class="btn btn-communication" onclick="viewPharmacistCommunications()" style="margin-top: 10px;">
+        📨 查看通知記錄
+      </button>
+    </div>
+  </div>
+
+  <!-- 訊息區域 -->
+  <div id="errorMessage" class="message error-message" style="display: none;"></div>
+  <div id="successMessage" class="message success-message" style="display: none;"></div>
+  <div id="infoMessage" class="message info-message" style="display: none;"></div>
+
+  <!-- MedicationRequest 清單 -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">📋 MedicationRequest 清單</h2>
+      <button class="btn" onclick="loadMedicationRequests()">
+        🔄 刷新資料
+      </button>
+    </div>
+    <div class="table-container">
+      <table id="medTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>病人</th>
+            <th>藥品</th>
+            <th>劑量/頻次</th>
+            <th>醫師備註</th>
+            <th>狀態</th>
+            <th>對應 ServiceRequest</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 通知記錄 Modal -->
+<div id="communicationModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title">📨 通知記錄</h2>
+      <button class="modal-close" onclick="closeCommunicationModal()">×</button>
+    </div>
+    <div id="communicationList"></div>
+  </div>
+</div>
+
+<script>
+const hospitalFhirUrl = "http://203.64.84.209:8080/fhir";
+let currentPractitioner = null;
+
+// -------------------- 顯示訊息函數 --------------------
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  document.getElementById('successMessage').style.display = 'none';
+  document.getElementById('infoMessage').style.display = 'none';
+}
+
+function showSuccess(message) {
+  const successDiv = document.getElementById('successMessage');
+  successDiv.textContent = message;
+  successDiv.style.display = 'block';
+  document.getElementById('errorMessage').style.display = 'none';
+  document.getElementById('infoMessage').style.display = 'none';
+}
+
+function showInfo(message) {
+  const infoDiv = document.getElementById('infoMessage');
+  infoDiv.textContent = message;
+  infoDiv.style.display = 'block';
+  document.getElementById('errorMessage').style.display = 'none';
+  document.getElementById('successMessage').style.display = 'none';
+}
+
+function hideMessages() {
+  document.getElementById('errorMessage').style.display = 'none';
+  document.getElementById('successMessage').style.display = 'none';
+  document.getElementById('infoMessage').style.display = 'none';
+}
+
+// -------------------- 從 cookie 取值 --------------------
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+// -------------------- 登出功能 --------------------
+function logout() {
+  const cookies = document.cookie.split(";");
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i];
+    const eqPos = cookie.indexOf("=");
+    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+    if (name === "token" || name === "selectedRole") {
+      document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+  }
+  window.location.href = "/login.html";
+}
+
+// ---------- 檢查 MedicationRequest 是否屬於當前藥師 ----------
+function isMyMedicationRequest(medicationRequest) {
+  if (!currentPractitioner || !currentPractitioner.practitionerId) {
+    console.log("沒有當前藥師資訊，無法檢查歸屬");
+    return false;
+  }
+  
+  let performerRef = null;
+  if (Array.isArray(medicationRequest.performer)) {
+    performerRef = medicationRequest.performer[0]?.reference;
+  } else if (medicationRequest.performer && medicationRequest.performer.reference) {
+    performerRef = medicationRequest.performer.reference;
+  }
+  
+  // 檢查 performer 是否包含當前藥師的 ID
+  const isMine = performerRef && performerRef.includes(currentPractitioner.practitionerId);
+  
+  if (!isMine) {
+    console.log(`MedicationRequest ${medicationRequest.id} 不屬於當前藥師，performer: ${performerRef}, 當前藥師: ${currentPractitioner.practitionerId}`);
+  }
+  
+  return isMine;
+}
+
+// ---------- 載入登入藥師資料 ----------
+async function loadCurrentPractitioner() {
+  try {
+    const roleCookie = getCookie("selectedRole");
+    if (!roleCookie) {
+      showError("尚未選擇角色，請重新登入或選擇角色");
+      setTimeout(() => {
+        window.location.href = "/choose-organization.html";
+      }, 2000);
+      return;
+    }
+
+    currentPractitioner = JSON.parse(roleCookie);
+
+    if (currentPractitioner.roleType !== "pharmacist") {
+      showError("您選擇的角色不是藥師，無法進入此頁面");
+      setTimeout(() => {
+        window.location.href = "/choose-organization.html";
+      }, 2000);
+      return;
+    }
+
+    await updateUserInfoDisplay();
+    hideMessages();
+
+  } catch (err) {
+    console.error("載入藥師資料失敗:", err);
+    showError("載入藥師資料失敗: " + err.message);
+  }
+}
+
+// -------------------- 更新頁面使用者資訊顯示 --------------------
+async function updateUserInfoDisplay() {
+  if (!currentPractitioner) return;
+  
+  let orgName = "未知機構";
+  
+  if (currentPractitioner.organizationName && currentPractitioner.organizationName.startsWith('Organization/')) {
+    const orgId = currentPractitioner.organizationName.replace('Organization/', '');
+    try {
+      const orgRes = await fetch(`${hospitalFhirUrl}/Organization/${orgId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgName = orgData.name || orgId;
+      } else {
+        orgName = orgId;
+      }
+    } catch (err) {
+      console.error("獲取機構名稱失敗:", err);
+      orgName = orgId;
+    }
+  } else if (currentPractitioner.organizationName) {
+    orgName = currentPractitioner.organizationName;
+  } else if (currentPractitioner.organizationId) {
+    try {
+      const orgRes = await fetch(`${hospitalFhirUrl}/Organization/${currentPractitioner.organizationId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgName = orgData.name || currentPractitioner.organizationId;
+      } else {
+        orgName = currentPractitioner.organizationId;
+      }
+    } catch (err) {
+      console.error("獲取機構名稱失敗:", err);
+      orgName = currentPractitioner.organizationId;
+    }
+  }
+  
+  let pharmacistName = "未知藥師";
+  try {
+    const pracRes = await fetch(`${hospitalFhirUrl}/Practitioner/${currentPractitioner.practitionerId}`);
+    if (pracRes.ok) {
+      const practitioner = await pracRes.json();
+      if (practitioner.name && practitioner.name[0]) {
+        const name = practitioner.name[0];
+        if (name.text) {
+          pharmacistName = name.text;
+        } else {
+          const family = name.family || '';
+          const given = name.given ? name.given.join(' ') : '';
+          pharmacistName = `${family} ${given}`.trim();
+        }
+      }
+    }
+  } catch (err) {
+    console.error("獲取藥師名稱失敗:", err);
+  }
+  
+  document.getElementById("currentOrganization").textContent = orgName;
+  document.getElementById("currentUser").textContent = `${pharmacistName} (${currentPractitioner.jobTitle || '藥師'})`;
+}
+
+// ---------- 載入 MedicationRequest 資料 ----------
+async function loadMedicationRequests() {
+  try {
+    console.log("開始載入 MedicationRequest 資料...");
+    console.log("當前藥師 ID:", currentPractitioner?.practitionerId);
+    
+    // 載入所有 MedicationRequest
+    const medResBundle = await fetch(`${hospitalFhirUrl}/MedicationRequest`).then(r => r.json());
+    console.log("所有 MedicationRequest 資料數量:", medResBundle.entry?.length || 0);
+    
+    // 載入 ServiceRequest - 建立映射關係
+    const srBundle = await fetch(`${hospitalFhirUrl}/ServiceRequest`).then(r => r.json());
+    console.log("ServiceRequest 資料數量:", srBundle.entry?.length || 0);
+
+    const medTbody = document.querySelector("#medTable tbody");
+    medTbody.innerHTML = "";
+
+    // 統計計數器 - 只計算當前藥師的資料
+    let pendingMedCount = 0;
+    let completedMedCount = 0;
+    let pendingSRCount = 0;
+
+    // 建立 SR map（MedID -> SRs）
+    const srMap = {};
+    if(srBundle.entry){
+      srBundle.entry.forEach(e=>{
+        const sr = e.resource;
+        if(sr.basedOn){
+          sr.basedOn.forEach(b=>{
+            const medId = b.reference.replace("MedicationRequest/","");
+            if(!srMap[medId]) srMap[medId]=[];
+            srMap[medId].push(sr);
+          });
+        }
+      });
+    }
+
+    console.log("SR Map 大小:", Object.keys(srMap).length);
+
+    // 處理 MedicationRequest
+    if(medResBundle.entry){
+      for(const entry of medResBundle.entry){
+        const med = entry.resource;
+        const medId = med.id;
+
+        console.log(`處理 MedicationRequest ${medId}, 狀態: ${med.status}`);
+
+        // ✅ 重要修正：先檢查這個 MedicationRequest 是否屬於當前藥師
+        // 不屬於當前藥師的資料，直接跳過
+        if (!isMyMedicationRequest(med)) {
+          console.log(`跳過 MedicationRequest ${medId}，不屬於當前藥師`);
+          continue;
+        }
+
+        // ✅ 修改：隱藏 on-hold 狀態的資料
+        if(med.status === "on-hold") {
+          console.log(`跳過 MedicationRequest ${medId}，狀態為 on-hold（已隱藏）`);
+          continue;
+        }
+
+        // ✅ 修改：處理 completed 狀態 - 只統計不顯示
+        if(med.status === "completed") {
+          // 更新統計但不顯示在表格中
+          completedMedCount++;
+          
+          // 檢查對應的 ServiceRequest 數量
+          const relatedSRs = srMap[medId] || [];
+          if (relatedSRs.length > 0) {
+            pendingSRCount++;
+          }
+          console.log(`統計 MedicationRequest ${medId}（completed），但不顯示在表格中`);
+          continue;
+        }
+
+        // ✅ 修改：只顯示 active 狀態的資料
+        if (med.status === "active") {
+          // 更新統計 - 只統計 active 狀態
+          pendingMedCount++;
+
+          const relatedSRs = srMap[medId] || [];
+
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${medId}</td>
+            <td>${med.subject?.reference?.replace("Patient/","")||""}</td>
+            <td>${med.medicationCodeableConcept?.text||""}</td>
+            <td>${med.dosageInstruction?.map(d=>d.text).join("; ")||""}</td>
+            <td>${med.note?.map(n=>n.text).join("; ")||""}</td>
+            <td><span class="status-badge status-active">待審核</span></td>
+            <td>${relatedSRs.length > 0 ? relatedSRs.map(sr => sr.id).join(", ") : "無"}</td>
+            <td>
+              <div class="action-buttons">
+                <button class="action-btn btn-success">✅ 通過</button>
+                <button class="action-btn btn-danger">❌ 不通過</button>
+              </div>
+            </td>
+          `;
+          medTbody.appendChild(row);
+
+          // 綁定事件
+          const approveBtn = row.querySelector(".btn-success");
+          const rejectBtn = row.querySelector(".btn-danger");
+          const srs = relatedSRs.map(sr => sr.id);
+
+          approveBtn.addEventListener("click", ()=>approveMedicationRequest(medId, srs, row));
+          rejectBtn.addEventListener("click", ()=>rejectMedicationRequest(medId, srs, row));
+        } else {
+          console.log(`跳過 MedicationRequest ${medId}，狀態為 ${med.status} 且不是 active`);
+        }
+      }
+    }
+
+    // 如果沒有資料，顯示提示
+    if (medTbody.children.length === 0) {
+      medTbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="empty-state">
+            <div class="empty-state-icon">💊</div>
+            <div>目前沒有待審核的 MedicationRequest</div>
+            <small style="margin-top: 10px; display: block; color: #999;">
+              只顯示屬於您的處方（performer 為您的藥師 ID）
+            </small>
+          </td>
+        </tr>
+      `;
+    }
+
+    // 更新統計資料
+    document.getElementById("pendingMedCount").textContent = pendingMedCount;
+    document.getElementById("completedMedCount").textContent = completedMedCount;
+    document.getElementById("pendingSRCount").textContent = pendingSRCount;
+
+    console.log("MedicationRequest 資料載入完成");
+    console.log(`統計（僅限當前藥師）：待審核=${pendingMedCount}, 已通過=${completedMedCount}, 待處理SR=${pendingSRCount}`);
+    showInfo(`已載入資料：${pendingMedCount} 個待審核處方，${completedMedCount} 個已通過處方，${pendingSRCount} 個待處理 ServiceRequest`);
+
+  } catch (err) {
+    console.error("載入 MedicationRequest 資料失敗:", err);
+    showError("載入資料失敗，請稍後重試");
+  }
+}
+
+// ---------- 藥師通過 MedicationRequest ----------
+async function approveMedicationRequest(medId, srIds, row){
+  try {
+    // 顯示載入狀態
+    row.querySelectorAll("button").forEach(b=>{
+      b.innerHTML = '<span class="loading"></span>處理中...';
+      b.disabled = true;
+    });
+
+    const medRes = await fetch(`${hospitalFhirUrl}/MedicationRequest/${medId}`).then(r=>r.json());
+    
+    // 通過時狀態改為 completed
+    medRes.status = "completed";
+    
+    await fetch(`${hospitalFhirUrl}/MedicationRequest/${medId}`, {
+      method: "PUT", 
+      headers: {"Content-Type":"application/fhir+json"}, 
+      body: JSON.stringify(medRes)
+    });
+
+    // ✅ 修改：直接從表格中移除該行（因為 completed 狀態不顯示）
+    row.remove();
+    
+    await notifyDoctor(medRes, srIds, true, medRes.subject?.reference?.replace("Patient/",""));
+    showSuccess(`✅ MedicationRequest ${medId} 已通過審核，狀態改為 completed`);
+
+    // 重新載入統計資料
+    loadMedicationRequests();
+
+  } catch(err){ 
+    console.error(err);
+    showError("審核操作失敗，請稍後重試");
+  }
+}
+
+// ---------- 藥師不通過 MedicationRequest ----------
+async function rejectMedicationRequest(medId, srIds, row){
+  try {
+    // 顯示載入狀態
+    row.querySelectorAll("button").forEach(b=>{
+      b.innerHTML = '<span class="loading"></span>處理中...';
+      b.disabled = true;
+    });
+
+    // 1️⃣ 先刪除 ServiceRequest
+    await Promise.all(srIds.map(id => 
+      fetch(`${hospitalFhirUrl}/ServiceRequest/${id}`, { method: "DELETE" })
+    ));
+
+    // 2️⃣ 將 MedicationRequest 狀態改為 on-hold
+    const medRes = await fetch(`${hospitalFhirUrl}/MedicationRequest/${medId}`).then(r => r.json());
+    medRes.status = "on-hold";
+    
+    await fetch(`${hospitalFhirUrl}/MedicationRequest/${medId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/fhir+json" },
+      body: JSON.stringify(medRes)
+    });
+
+    // ✅ 修改：直接從表格中移除該行（因為 on-hold 狀態要隱藏）
+    row.remove();
+
+    // 3️⃣ 發送「不通過」通知給醫師
+    const patientId = medRes.subject?.reference?.replace("Patient/", "") || "";
+    await notifyDoctor(medRes, srIds, false, patientId);
+
+    showSuccess(`✅ MedicationRequest ${medId} 已退回，相關 ServiceRequest 已刪除`);
+
+    // 重新載入統計資料
+    loadMedicationRequests();
+
+  } catch(err){
+    console.error("❌ rejectMedicationRequest 發生錯誤:", err);
+    showError("不通過操作失敗，請稍後再試");
+  }
+}
+
+async function notifyDoctor(medRes, srIds, approved, patientId) {
+  try {
+    const realPatientId = patientId || medRes.subject?.reference?.replace("Patient/", "");
+    const realPractitionerId = currentPractitioner?.practitionerId || currentPractitioner?.id;
+
+    const doctorRef = medRes.requester?.reference;
+    if (!doctorRef) {
+      console.warn("⚠️ 找不到開立醫師資訊，無法發送通知");
+      return;
+    }
+
+    // 獲取藥師名稱
+    let pharmacistName = "藥師";
+    try {
+      const pharmacistRes = await fetch(`${hospitalFhirUrl}/Practitioner/${realPractitionerId}`);
+      if (pharmacistRes.ok) {
+        const pharmacistData = await pharmacistRes.json();
+        if (pharmacistData.name && pharmacistData.name[0]) {
+          const name = pharmacistData.name[0];
+          if (name.text) {
+            pharmacistName = name.text;
+          } else {
+            const family = name.family || '';
+            const given = name.given ? name.given.join(' ') : '';
+            pharmacistName = `${family} ${given}`.trim() || pharmacistName;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("獲取藥師名稱失敗:", err);
+    }
+
+    // 獲取病人名稱
+    let patientName = `病人 ${realPatientId}`;
+    try {
+      const patientRes = await fetch(`${hospitalFhirUrl}/Patient/${realPatientId}`);
+      if (patientRes.ok) {
+        const patientData = await patientRes.json();
+        if (patientData.name && patientData.name[0]) {
+          const name = patientData.name[0];
+          if (name.text) {
+            patientName = name.text;
+          } else {
+            const family = name.family || '';
+            const given = name.given ? name.given.join(' ') : '';
+            patientName = `${family} ${given}`.trim() || patientName;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("獲取病人名稱失敗:", err);
+    }
+
+    const contentStr = approved
+      ? `✅ 藥師 ${pharmacistName} 已通過處方 ${medRes.id}（病人: ${patientName}），狀態改為 completed`
+      : `❌ 藥師 ${pharmacistName} 已退回處方 ${medRes.id}（病人: ${patientName}），狀態改為 on-hold`;
+
+    const communication = {
+      resourceType: "Communication",
+      status: "completed",
+      sent: new Date().toISOString(),
+      subject: { reference: `Patient/${realPatientId}` },
+      sender: { 
+        reference: `Practitioner/${realPractitionerId}`,
+        display: pharmacistName
+      },
+      recipient: [{ 
+        reference: doctorRef,
+        display: "開立醫師"
+      }],
+      payload: [{ contentString: contentStr }],
+      category: [{
+        coding: [{
+          system: "http://terminology.hl7.org/CodeSystem/communication-category",
+          code: "notification"
+        }],
+        text: "處方審核通知"
+      }],
+      note: [{
+        text: `MedicationRequest ID: ${medRes.id}, 審核結果: ${approved ? '通過' : '不通過'}`
+      }]
+    };
+
+    const res = await fetch(`${hospitalFhirUrl}/Communication`, {
+      method: "POST",
+      headers: { "Content-Type": "application/fhir+json" },
+      body: JSON.stringify(communication)
+    });
+
+    if (res.ok) {
+      console.log(`📨 已通知醫師 ${doctorRef}`);
+    } else {
+      console.error("❌ 通知醫師失敗:", await res.text());
+    }
+
+  } catch (err) {
+    console.error("notifyDoctor 發生錯誤:", err);
+  }
+}
+
+// ---------- 查看藥師相關的 Communication ----------
+async function viewPharmacistCommunications() {
+  try {
+    console.log("開始載入藥師相關的 Communication...");
+    
+    const modal = document.getElementById('communicationModal');
+    const communicationList = document.getElementById('communicationList');
+    communicationList.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="loading"></div><p>載入中...</p></div>';
+    modal.style.display = 'block';
+    
+    // 從醫院端獲取所有 Communication
+    const response = await fetch(`${hospitalFhirUrl}/Communication`);
+    if (!response.ok) {
+      throw new Error(`載入 Communication 失敗: ${response.status}`);
+    }
+    
+    const bundle = await response.json();
+    
+    communicationList.innerHTML = '';
+    
+    if (!bundle.entry || bundle.entry.length === 0) {
+      communicationList.innerHTML = `
+        <div style="text-align: center; padding: 2rem;">
+          <div class="empty-state-icon">📨</div>
+          <h3>沒有找到通知記錄</h3>
+          <p>目前沒有任何通知記錄</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // 獲取藥師資訊
+    let pharmacistName = "藥師";
+    let practitionerReference = `Practitioner/${currentPractitioner.practitionerId}`;
+    
+    try {
+      const pharmacistRes = await fetch(`${hospitalFhirUrl}/Practitioner/${currentPractitioner.practitionerId}`);
+      if (pharmacistRes.ok) {
+        const pharmacistData = await pharmacistRes.json();
+        if (pharmacistData.name && pharmacistData.name[0]) {
+          const name = pharmacistData.name[0];
+          if (name.text) {
+            pharmacistName = name.text;
+          } else {
+            const family = name.family || '';
+            const given = name.given ? name.given.join(' ') : '';
+            pharmacistName = `${family} ${given}`.trim() || pharmacistName;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("獲取藥師名稱失敗:", err);
+    }
+    
+    // 顯示藥師資訊
+    const pharmacistInfo = document.createElement('div');
+    pharmacistInfo.className = 'communication-item';
+    pharmacistInfo.innerHTML = `
+      <div style="margin-bottom: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 8px;">
+        <strong>👨‍⚕️ 當前藥師:</strong> ${pharmacistName}<br>
+        <small>ID: ${currentPractitioner.practitionerId}</small>
+      </div>
+    `;
+    communicationList.appendChild(pharmacistInfo);
+    
+    let foundCommunications = false;
+    let communicationCount = 0;
+    
+    // 過濾與當前藥師相關的 Communication
+    for (const entry of bundle.entry) {
+      const communication = entry.resource;
+      
+      // 檢查是否與當前藥師相關
+      let isRelated = false;
+      let relationType = "";
+      
+      // 檢查發送者
+      if (communication.sender && communication.sender.reference) {
+        if (communication.sender.reference === practitionerReference) {
+          isRelated = true;
+          relationType = "發送者";
+        }
+      }
+      
+      // 檢查接收者
+      if (communication.recipient && Array.isArray(communication.recipient)) {
+        const isRecipient = communication.recipient.some(recipient => 
+          recipient.reference === practitionerReference
+        );
+        if (isRecipient) {
+          isRelated = true;
+          relationType = relationType ? `${relationType}/接收者` : "接收者";
+        }
+      }
+      
+      // 如果是與當前藥師相關的通知
+      if (isRelated) {
+        foundCommunications = true;
+        communicationCount++;
+        
+        // 格式化時間
+        let sentTime = "未知時間";
+        if (communication.sent) {
+          const sentDate = new Date(communication.sent);
+          sentTime = sentDate.toLocaleString('zh-TW');
+        }
+        
+        // 獲取發送者名稱
+        let senderName = "未知發送者";
+        if (communication.sender && communication.sender.display) {
+          senderName = communication.sender.display;
+        } else if (communication.sender && communication.sender.reference) {
+          senderName = communication.sender.reference;
+        }
+        
+        // 獲取接收者名稱
+        let recipientNames = [];
+        if (communication.recipient && Array.isArray(communication.recipient)) {
+          communication.recipient.forEach(recipient => {
+            if (recipient.display) {
+              recipientNames.push(recipient.display);
+            } else if (recipient.reference) {
+              recipientNames.push(recipient.reference);
+            }
+          });
+        }
+        
+        // 獲取訊息內容
+        let messageContent = "無訊息內容";
+        if (communication.payload && communication.payload[0] && communication.payload[0].contentString) {
+          messageContent = communication.payload[0].contentString;
+        }
+        
+        // 狀態標籤
+        let statusBadge = "";
+        if (communication.status === "completed") {
+          statusBadge = '<span class="communication-status status-completed">已發送</span>';
+        } else if (communication.status === "in-progress") {
+          statusBadge = '<span class="communication-status status-pending">處理中</span>';
+        } else {
+          statusBadge = `<span class="communication-status">${communication.status || "未知"}</span>`;
+        }
+        
+        // 創建通知項目
+        const communicationItem = document.createElement('div');
+        communicationItem.className = 'communication-item';
+        communicationItem.innerHTML = `
+          <div class="communication-header">
+            <div>
+              <strong>${senderName}</strong>
+              ${statusBadge}
+            </div>
+            <small>${sentTime}</small>
+          </div>
+          <div class="communication-meta">
+            <div>關聯類型: ${relationType}</div>
+            <div>通知 ID: ${communication.id}</div>
+            ${recipientNames.length > 0 ? `<div>接收者: ${recipientNames.join(', ')}</div>` : ''}
+          </div>
+          <div class="communication-body">
+            <p><strong>訊息內容:</strong> ${messageContent}</p>
+            ${communication.category ? `<div style="margin-top: 0.5rem;"><strong>分類:</strong> ${communication.category[0]?.text || '無'}</div>` : ''}
+          </div>
+        `;
+        
+        communicationList.appendChild(communicationItem);
+      }
+    }
+    
+    // 如果沒有找到相關通知
+    if (!foundCommunications) {
+      communicationList.innerHTML += `
+        <div style="text-align: center; padding: 2rem;">
+          <div class="empty-state-icon">📭</div>
+          <h3>沒有找到相關通知</h3>
+          <p>目前沒有與您相關的通知記錄</p>
+          <div style="margin-top: 1rem; font-size: 0.9em; color: #666;">
+            您作為藥師，相關的通知包括：
+            <ul style="text-align: left; margin-top: 0.5rem;">
+              <li>您發送給醫師的處方審核通知</li>
+              <li>其他人發送給您的通知</li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else {
+      // 顯示統計資訊
+      const statsInfo = document.createElement('div');
+      statsInfo.className = 'communication-item';
+      statsInfo.style.background = '#f0f7ff';
+      statsInfo.innerHTML = `
+        <div style="text-align: center;">
+          <strong>📊 通知統計</strong>
+          <div style="display: flex; justify-content: space-around; margin-top: 1rem;">
+            <div>
+              <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${communicationCount}</div>
+              <div style="font-size: 0.8rem;">總通知數</div>
+            </div>
+            <div>
+              <div style="font-size: 1.5rem; font-weight: bold; color: #4caf50;">${new Date().toLocaleDateString('zh-TW')}</div>
+              <div style="font-size: 0.8rem;">查詢日期</div>
+            </div>
+          </div>
+        </div>
+      `;
+      communicationList.insertBefore(statsInfo, communicationList.firstChild.nextSibling);
+    }
+    
+  } catch (err) {
+    console.error("載入 Communication 失敗:", err);
+    const communicationList = document.getElementById('communicationList');
+    communicationList.innerHTML = `
+      <div style="text-align: center; padding: 2rem; color: #f44336;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
+        <h3>載入失敗</h3>
+        <p>${err.message}</p>
+        <button onclick="viewPharmacistCommunications()" style="margin-top: 1rem; padding: 0.5rem 1rem; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+          重試
+        </button>
+      </div>
+    `;
+  }
+}
+
+// ---------- 關閉 Communication Modal ----------
+function closeCommunicationModal() {
+  const modal = document.getElementById('communicationModal');
+  modal.style.display = 'none';
+}
+
+// ---------- 初始化 ----------
+(async function init(){
+  await loadCurrentPractitioner();
+  await loadMedicationRequests();
+  
+  // 每2分鐘自動刷新資料
+  setInterval(loadMedicationRequests, 2 * 60 * 1000);
+})();
+
+// 點擊模態框外部關閉
+window.addEventListener('click', function(event) {
+  const modal = document.getElementById('communicationModal');
+  if (event.target === modal) {
+    closeCommunicationModal();
+  }
+});
+
+// ESC 鍵關閉模態框
+document.addEventListener('keydown', function(event) {
+  const modal = document.getElementById('communicationModal');
+  if (event.key === 'Escape' && modal.style.display === 'block') {
+    closeCommunicationModal();
+  }
+});
+</script>
+
+</body>
+</html>

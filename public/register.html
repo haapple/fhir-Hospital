@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <title data-i18n="register.pageTitle">註冊新帳號</title>
+  <style>
+     /* 整頁背景與全域設定 */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      height: 100%;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      position: relative;
+    }
+
+    /* 語言切換按鈕 */
+    .lang-switcher {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid #fff;
+      background: rgba(255,255,255,0.15);
+      color: #750a7a;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+      transition: background 0.2s, border-color 0.2s;
+      z-index: 1000;
+    }
+    .lang-switcher:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.8);
+    }
+    .lang-switcher::-ms-expand { display: none; }
+
+    /* 玻璃卡片容器 */
+    .card {
+      max-width: 400px;
+      margin: 5vh auto;
+      padding: 2rem;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .card h2 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      font-size: 1.6rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    /* 表單樣式 */
+    .card form label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .card form input {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: background 0.2s;
+    }
+    .card form input::placeholder {
+      color: rgba(255,255,255,0.7);
+    }
+    .card form input:focus {
+      background: rgba(255,255,255,0.35);
+    }
+    
+    /* 錯誤提示訊息 */
+    .error-message {
+      color: #ffcc00;
+      font-size: 0.85rem;
+      margin-top: -0.75rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    /* 註冊按鈕 */
+    .card form button {
+      width: 100%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      background: #ff8a65;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .card form button:hover {
+      background: #ff7043;
+      transform: translateY(-2px);
+    }
+
+    /* 下方小按鈕群：登入 & 忘記密碼 */
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+    }
+    .actions a {
+      font-size: 0.85rem;
+      text-decoration: none;
+      color: #e0e0ff;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .actions a:hover {
+      background: rgba(255,255,255,0.3);
+      color: #fff;
+    }
+
+    /* 結果區塊 */
+    .card pre {
+      display: none;
+      margin-top: 1.5rem;
+      max-height: 120px;
+      overflow: auto;
+      background: rgba(0,0,0,0.3);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 data-i18n="register.title">註冊帳號</h2>
+    <form id="registerForm">
+      <label data-i18n="register.name">姓名:</label>
+      <input type="text" id="name" required>
+      
+      <label data-i18n="register.loginId">登入帳號:</label>
+      <input type="text" id="loginId" required>
+      
+      <label data-i18n="register.email">Email:</label>
+      <input type="email" id="email" required>
+      
+      <label data-i18n="register.phone">電話:</label>
+      <input type="tel" id="phone" required>
+
+      <label data-i18n="register.birthday">生日:</label>
+      <input type="date" id="birthday" required>
+      <div class="error-message" id="birthdayError">生日必須在20歲以上、100歲以下</div>
+
+      <label data-i18n="register.password">密碼:</label>
+      <input type="password" id="password" required>
+      <button type="submit" data-i18n="register.submit">註冊</button>
+    </form>
+    <pre id="output"></pre>
+  </div>
+
+<script>
+  // --- 計算日期限制（20歲以上，100歲以下） ---
+  function calculateDateLimits() {
+    const today = new Date();
+    const maxDate = new Date();
+    const minDate = new Date();
+    
+    // 最大日期：20年前（20歲以上）
+    maxDate.setFullYear(today.getFullYear() - 20);
+    
+    // 最小日期：100年前（100歲以下）
+    minDate.setFullYear(today.getFullYear() - 100);
+    
+    // 格式化為 YYYY-MM-DD
+    function formatDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    return {
+      max: formatDate(maxDate),
+      min: formatDate(minDate)
+    };
+  }
+
+  // --- Load Organizations and Job Titles on page load ---
+  document.addEventListener('DOMContentLoaded', async () => {
+    // 設置生日輸入框的限制
+    const dateLimits = calculateDateLimits();
+    const birthdayInput = document.getElementById('birthday');
+    birthdayInput.max = dateLimits.max;
+    birthdayInput.min = dateLimits.min;
+    
+    // 可選：設置預設值為最大允許日期（20年前）
+    // birthdayInput.value = dateLimits.max;
+
+    // 添加生日驗證事件
+    birthdayInput.addEventListener('change', validateBirthday);
+    
+    // Fetch and populate organizations
+    try {
+      const orgRes = await fetch('/api/organizations');
+      const orgs = await orgRes.json();
+      const orgSelect = document.getElementById('organizationId');
+      orgSelect.innerHTML = '<option value="">請選擇醫院</option>';
+      orgs.forEach(org => {
+        orgSelect.innerHTML += `<option value="${org.id}">${org.name}</option>`;
+      });
+    } catch (err) {
+      document.getElementById('organizationId').innerHTML = '<option value="">無法載入醫院</option>';
+    }
+
+    // Fetch and populate job titles
+    try {
+      const jobRes = await fetch('/api/job-titles');
+      const jobs = await jobRes.json();
+      const jobSelect = document.getElementById('jobTitle');
+      jobSelect.innerHTML = '';
+      
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.text = '請選擇職稱';
+      jobSelect.appendChild(defaultOption);
+
+      jobs.forEach(job => {
+        const option = document.createElement('option');
+        option.value = job.code || job.display;   // 保險起見
+        option.text = job.display || job.code;
+        jobSelect.appendChild(option);
+      });
+    } catch (err) {
+      const jobSelect = document.getElementById('jobTitle');
+      jobSelect.innerHTML = '';
+      const option = document.createElement('option');
+      option.value = '';
+      option.text = '無法載入職稱';
+      jobSelect.appendChild(option);
+    }
+  });
+
+  // --- 驗證生日函數 ---
+  function validateBirthday() {
+    const birthdayInput = document.getElementById('birthday');
+    const errorElement = document.getElementById('birthdayError');
+    const selectedDate = new Date(birthdayInput.value);
+    const today = new Date();
+    
+    if (!birthdayInput.value) {
+      errorElement.style.display = 'none';
+      return true;
+    }
+    
+    // 計算年齡
+    const age = today.getFullYear() - selectedDate.getFullYear();
+    const monthDiff = today.getMonth() - selectedDate.getMonth();
+    
+    // 如果還沒過今年的生日，年齡減1
+    const adjustedAge = (monthDiff < 0 || (monthDiff === 0 && today.getDate() < selectedDate.getDate())) 
+      ? age - 1 
+      : age;
+    
+    if (adjustedAge < 20 || adjustedAge > 100) {
+      errorElement.style.display = 'block';
+      return false;
+    } else {
+      errorElement.style.display = 'none';
+      return true;
+    }
+  }
+
+  // --- Form Submission ---
+  document.getElementById('registerForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    
+    // 先驗證生日
+    if (!validateBirthday()) {
+      const output = document.getElementById('output');
+      output.style.display = 'block';
+      output.textContent = JSON.stringify({
+        error: true,
+        message: '生日必須在20歲以上、100歲以下'
+      }, null, 2);
+      return;
+    }
+    
+    const output = document.getElementById('output');
+    
+    const data = {
+      name: document.getElementById('name').value,
+      loginId: document.getElementById('loginId').value,
+      email: document.getElementById('email').value,
+      phone: document.getElementById('phone').value,
+      birthday: document.getElementById('birthday').value,
+      password: document.getElementById('password').value
+    };
+
+    const res = await fetch('/api/person/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+    output.style.display = 'block';
+    output.textContent = JSON.stringify(result, null, 2);
+
+    if (res.ok) {
+      // Redirect to login page on successful registration
+      setTimeout(() => {
+        window.location.href = '/login.html';
+      }, 2000);
+    }
+  });
+</script>
+
+</body>
+</html>

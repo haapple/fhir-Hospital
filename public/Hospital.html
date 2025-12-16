@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FHIR 醫院管理平台 - 管理員版</title>
+  <style>
+    /* 全局 & 背景 - 與登入頁面一致 */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100vh;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      padding: 20px;
+    }
+    
+    /* Header */
+    .header {
+      width: 100%;
+      padding: 1rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .header h1 {
+      color: #fff;
+      font-size: 1.8rem;
+      margin: 0;
+    }
+    
+    .header .server-info {
+      background: rgba(255,255,255,0.15);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      backdrop-filter: blur(5px);
+      font-size: 0.9rem;
+    }
+    
+    /* 毛玻璃卡片容器 */
+    .container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    
+    .card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    
+    .card h2 {
+      margin-bottom: 1rem;
+      color: #fff;
+      font-size: 1.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    /* 表單元素 */
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 0.3rem;
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 0.6rem;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.85);
+      color: #333;
+      transition: background 0.2s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+      background: rgba(255,255,255,0.95);
+      outline: none;
+    }
+    
+    .form-group input[readonly] {
+      background: rgba(255,255,255,0.6);
+      color: #666;
+    }
+    
+    /* 下拉選單選項樣式 */
+    .form-group select option {
+      background: #fff;
+      color: #333;
+      padding: 10px;
+    }
+    
+    /* 查詢下拉選單 */
+    #queryResourceType {
+      background: rgba(255,255,255,0.85);
+      color: #333;
+    }
+    
+    #queryResourceType option {
+      background: #fff;
+      color: #333;
+    }
+    
+    /* 按鈕樣式 */
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      background: #ff8a65;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+      flex: 1;
+      min-width: 120px;
+    }
+    
+    button:hover {
+      background: #ff7043;
+      transform: translateY(-2px);
+    }
+    
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    button.secondary {
+      background: rgba(255,255,255,0.25);
+    }
+    
+    button.secondary:hover {
+      background: rgba(255,255,255,0.35);
+    }
+    
+    button.danger {
+      background: #ff5252;
+    }
+    
+    button.danger:hover {
+      background: #ff1744;
+    }
+    
+    button.success {
+      background: #4CAF50;
+    }
+    
+    button.success:hover {
+      background: #388E3C;
+    }
+    
+    /* 響應區域 */
+    .response-box {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      color: #e0e0e0;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    
+    .response-box.success {
+      border-left: 4px solid #4CAF50;
+    }
+    
+    .response-box.error {
+      border-left: 4px solid #ff4444;
+    }
+    
+    /* 查詢結果表格 */
+    .query-result {
+      margin-top: 1rem;
+      width: 100%;
+      overflow-x: auto;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    th {
+      background: rgba(255,255,255,0.2);
+      padding: 0.75rem;
+      text-align: left;
+      font-weight: 600;
+    }
+    
+    td {
+      padding: 0.75rem;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    tr:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    
+    /* 載入動畫 */
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* 底部查詢區域 */
+    .query-section {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      margin-top: 2rem;
+    }
+    
+    /* 響應式調整 */
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+      
+      .header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+      
+      button {
+        min-width: 100%;
+      }
+    }
+    
+    /* 圖標 */
+    .icon {
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🏥 FHIR 醫院管理平台 - 管理員版</h1>
+    <!-- 已移除顯示IP的伺服器資訊 -->
+  </div>
+
+  <div class="container">
+    <!-- 父組織卡片 -->
+    <div class="card">
+      <h2><span class="icon">🏢</span> 建立/修改父組織（總院）</h2>
+      <form id="orgParentForm">
+        <div class="form-group">
+          <label>組織 ID</label>
+          <input type="text" id="orgParentId" value="tzuchi" required>
+        </div>
+        
+        <div class="button-group">
+          <button type="button" id="btnLoadParentOrg" class="secondary">載入組織</button>
+          <button type="button" id="btnResetParentForm" class="secondary">重置表單</button>
+        </div>
+        
+        <div class="form-group">
+          <label>組織名稱</label>
+          <input type="text" id="orgParentName" value="慈濟醫院" required>
+        </div>
+        
+        <div class="button-group">
+          <button type="submit" class="success">建立/更新父組織</button>
+        </div>
+      </form>
+      <div id="orgParentResponse" class="response-box"></div>
+    </div>
+
+    <!-- 子組織卡片 -->
+    <div class="card">
+      <h2><span class="icon">🏥</span> 建立/修改子組織（分院）</h2>
+      <form id="orgChildForm">
+        <div class="form-group">
+          <label>子組織 ID</label>
+          <input type="text" id="orgChildId" value="tzuchi-branch1" required>
+        </div>
+        
+        <div class="button-group">
+          <button type="button" id="btnLoadChildOrg" class="secondary">載入組織</button>
+          <button type="button" id="btnResetChildForm" class="secondary">重置表單</button>
+        </div>
+        
+        <div class="form-group">
+          <label>子組織名稱</label>
+          <input type="text" id="orgChildName" value="慈濟健康中心" required>
+        </div>
+        
+        <div class="form-group">
+          <label>所屬父組織</label>
+          <select id="orgChildParentSelect"></select>
+        </div>
+        
+        <div class="button-group">
+          <button type="submit" class="success">建立/更新子組織</button>
+        </div>
+      </form>
+      <div id="orgChildResponse" class="response-box"></div>
+    </div>
+
+    <!-- 醫護人員卡片 -->
+    <div class="card">
+      <h2><span class="icon">👩⚕️</span> 建立 Practitioner（醫護人員）</h2>
+      <form id="practitionerForm">
+        <div class="form-group">
+          <label>選擇 Person</label>
+          <select id="personSelect"></select>
+        </div>
+        
+        <div class="form-group">
+          <label>姓名</label>
+          <input type="text" id="practitionerName" readonly>
+        </div>
+        
+        <div class="button-group">
+          <button type="submit" class="success">建立醫護人員</button>
+        </div>
+      </form>
+      <div id="practitionerResponse" class="response-box"></div>
+    </div>
+
+    <!-- 職位卡片 -->
+    <div class="card">
+      <h2><span class="icon">🩺</span> 建立 PractitionerRole（職位）</h2>
+      <form id="roleForm">
+        <div class="form-group">
+          <label>選擇 Practitioner</label>
+          <select id="practitionerSelect"></select>
+        </div>
+        
+        <div class="form-group">
+          <label>所屬組織</label>
+          <select id="roleOrgSelect"></select>
+        </div>
+        
+        <div class="form-group">
+          <label>職位名稱</label>
+          <select id="roleText">
+            <option value="主治醫師">主治醫師</option>
+            <option value="藥師">藥師</option>
+          </select>
+        </div>
+        
+        <div class="button-group">
+          <button type="submit" class="success">建立職位</button>
+        </div>
+      </form>
+      <div id="roleResponse" class="response-box"></div>
+    </div>
+  </div>
+
+  <!-- 查詢/刪除區域 -->
+  <div class="query-section">
+    <h2><span class="icon">🔍</span> 查詢 / 刪除資源</h2>
+    <form id="queryDeleteForm">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div class="form-group">
+          <label>資源類型</label>
+          <select id="queryResourceType">
+            <option value="Organization">Organization</option>
+            <option value="Practitioner">Practitioner</option>
+            <option value="PractitionerRole">PractitionerRole</option>
+            <option value="Person">Person</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label>資源 ID</label>
+          <input type="text" id="queryResourceId" placeholder="留空可查全部">
+        </div>
+        
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <div class="button-group">
+            <button id="btnQueryResource" type="button" class="secondary">查詢</button>
+            <button id="btnDeleteResource" type="button" class="danger">刪除</button>
+            <button id="btnRefreshAll" type="button" class="secondary">刷新所有資料</button>
+          </div>
+        </div>
+      </div>
+    </form>
+    <div id="queryDeleteResult" class="query-result"></div>
+  </div>
+
+<script>
+const FHIR_BASE = "http://203.64.84.209:8080/fhir";
+const allRoleOptions = ["主治醫師", "藥師"];
+
+// ---------- 通用建立 / 更新 ----------
+async function sendToFhir(resourceType, id, body, responseId) {
+  const responseBox = document.getElementById(responseId);
+  const button = event.target.querySelector('button[type="submit"]') || event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>處理中...';
+    
+    let url = `${FHIR_BASE}/${resourceType}`;
+    let method = "POST";
+    if(id && id.trim() !== "") {
+      url += `/${id}`;
+      body.id = id;
+      method = "PUT";
+    }
+    
+    const res = await fetch(url, {
+      method,
+      headers: {"Content-Type": "application/fhir+json"},
+      body: JSON.stringify(body)
+    });
+    
+    const data = await res.json();
+    responseBox.textContent = res.ok ? 
+      `✅ 成功${method === "POST" ? "建立" : "更新"}\n${JSON.stringify(data, null, 2)}` : 
+      `❌ 操作失敗\n${JSON.stringify(data, null, 2)}`;
+    responseBox.className = res.ok ? 'response-box success' : 'response-box error';
+    
+  } catch(err) {
+    responseBox.textContent = `❌ 網路或程式錯誤: ${err}`;
+    responseBox.className = 'response-box error';
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 查詢資源 ----------
+async function queryResource(resourceType, id) {
+  const resultBox = document.getElementById("queryDeleteResult");
+  const button = event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>查詢中...';
+    
+    let url = `${FHIR_BASE}/${resourceType}`;
+    if(id && id.trim() !== "") {
+      url += `/${id}`;
+    } else {
+      url += "?_count=100";
+    }
+    
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if (res.ok) {
+      let html = "<table>";
+      if(!id) {
+        const entries = data.entry || [];
+        if(resourceType === "Organization") {
+          html += "<tr><th>ID</th><th>名稱</th><th>類型</th><th>上層組織</th><th>操作</th></tr>";
+          entries.forEach(e => {
+            const org = e.resource;
+            const typeDisplay = org.type?.[0]?.coding?.[0]?.display || org.type?.[0]?.text || "-";
+            html += `<tr>
+              <td>${org.id || "-"}</td>
+              <td>${org.name || "-"}</td>
+              <td>${typeDisplay}</td>
+              <td>${org.partOf?.reference || "-"}</td>
+              <td>
+                <button onclick="loadOrganizationForEdit('${org.id}')" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">編輯</button>
+              </td>
+            </tr>`;
+          });
+        } else if(resourceType === "Person") {
+          html += "<tr><th>ID</th><th>姓名</th><th>連結 Practitioner</th></tr>";
+          entries.forEach(e => {
+            const p = e.resource;
+            const links = (p.link || []).map(l => l.target?.reference || "-").join(", ");
+            html += `<tr><td>${p.id || "-"}</td><td>${p.name?.[0]?.text || "-"}</td><td>${links}</td></tr>`;
+          });
+        } else if(resourceType === "Practitioner") {
+          html += "<tr><th>ID</th><th>姓名</th></tr>";
+          entries.forEach(e => {
+            const p = e.resource;
+            html += `<tr><td>${p.id || "-"}</td><td>${p.name?.[0]?.text || "-"}</td></tr>`;
+          });
+        } else if(resourceType === "PractitionerRole") {
+          html += "<tr><th>ID</th><th>人員</th><th>組織</th><th>職位</th></tr>";
+          entries.forEach(e => {
+            const r = e.resource;
+            html += `<tr><td>${r.id || "-"}</td><td>${r.practitioner?.reference || "-"}</td><td>${r.organization?.reference || "-"}</td><td>${r.code?.[0]?.text || "-"}</td></tr>`;
+          });
+        }
+      } else {
+        const d = data;
+        if(resourceType === "Organization") {
+          const typeDisplay = d.type?.[0]?.coding?.[0]?.display || d.type?.[0]?.text || "-";
+          html = `<tr><th>ID</th><th>名稱</th><th>類型</th><th>上層組織</th><th>操作</th></tr>
+                  <tr>
+                    <td>${d.id || "-"}</td>
+                    <td>${d.name || "-"}</td>
+                    <td>${typeDisplay}</td>
+                    <td>${d.partOf?.reference || "-"}</td>
+                    <td>
+                      <button onclick="loadOrganizationForEdit('${d.id}')" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">編輯</button>
+                    </td>
+                  </tr>`;
+        } else if(resourceType === "Person") {
+          const links = (d.link || []).map(l => l.target?.reference || "-").join(", ");
+          html = `<tr><th>ID</th><th>姓名</th><th>連結 Practitioner</th></tr><tr><td>${d.id || "-"}</td><td>${d.name?.[0]?.text || "-"}</td><td>${links}</td></tr>`;
+        } else if(resourceType === "Practitioner") {
+          html = `<tr><th>ID</th><th>姓名</th></tr><tr><td>${d.id || "-"}</td><td>${d.name?.[0]?.text || "-"}</td></tr>`;
+        } else if(resourceType === "PractitionerRole") {
+          html = `<tr><th>ID</th><th>人員</th><th>組織</th><th>職位</th></tr><tr><td>${d.id || "-"}</td><td>${d.practitioner?.reference || "-"}</td><td>${d.organization?.reference || "-"}</td><td>${d.code?.[0]?.text || "-"}</td></tr>`;
+        }
+      }
+      html += "</table>";
+      resultBox.innerHTML = html;
+    } else {
+      resultBox.innerHTML = `<div class="response-box error">❌ 查詢失敗: ${JSON.stringify(data, null, 2)}</div>`;
+    }
+  } catch(err) {
+    resultBox.innerHTML = `<div class="response-box error">❌ 查詢失敗: ${err.message}</div>`;
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 載入組織資料進行編輯 ----------
+async function loadOrganizationForEdit(orgId) {
+  try {
+    const res = await fetch(`${FHIR_BASE}/Organization/${orgId}`);
+    const org = await res.json();
+    
+    if (!res.ok) {
+      alert(`載入組織失敗: ${JSON.stringify(org, null, 2)}`);
+      return;
+    }
+    
+    // 檢查是父組織還是子組織
+    if (org.partOf) {
+      // 子組織 - 填寫子組織表單
+      document.getElementById('orgChildId').value = org.id || '';
+      document.getElementById('orgChildName').value = org.name || '';
+      
+      // 設置父組織選項
+      const parentOrgId = org.partOf.reference.split('/')[1];
+      const parentSelect = document.getElementById('orgChildParentSelect');
+      for (let i = 0; i < parentSelect.options.length; i++) {
+        if (parentSelect.options[i].value === parentOrgId) {
+          parentSelect.selectedIndex = i;
+          break;
+        }
+      }
+    } else {
+      // 父組織 - 填寫父組織表單
+      document.getElementById('orgParentId').value = org.id || '';
+      document.getElementById('orgParentName').value = org.name || '';
+    }
+    
+    alert(`✅ 已載入組織資料: ${org.name}`);
+  } catch (err) {
+    alert(`❌ 載入組織失敗: ${err}`);
+  }
+}
+
+// ---------- 載入父組織資料 ----------
+async function loadParentOrganization() {
+  const orgId = document.getElementById('orgParentId').value.trim();
+  if (!orgId) {
+    alert('請輸入組織 ID');
+    return;
+  }
+  
+  const button = document.getElementById('btnLoadParentOrg');
+  const originalText = button.innerHTML;
+  
+  try {
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>載入中...';
+    
+    const res = await fetch(`${FHIR_BASE}/Organization/${orgId}`);
+    const org = await res.json();
+    
+    if (!res.ok) {
+      alert(`載入組織失敗: ${JSON.stringify(org, null, 2)}`);
+      return;
+    }
+    
+    // 檢查是否為父組織（沒有 partOf）
+    if (org.partOf) {
+      alert('❌ 此組織是子組織，請使用子組織表單進行編輯');
+      return;
+    }
+    
+    document.getElementById('orgParentName').value = org.name || '';
+    alert(`✅ 已載入父組織資料: ${org.name}`);
+  } catch (err) {
+    alert(`❌ 載入組織失敗: ${err}`);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 載入子組織資料 ----------
+async function loadChildOrganization() {
+  const orgId = document.getElementById('orgChildId').value.trim();
+  if (!orgId) {
+    alert('請輸入組織 ID');
+    return;
+  }
+  
+  const button = document.getElementById('btnLoadChildOrg');
+  const originalText = button.innerHTML;
+  
+  try {
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>載入中...';
+    
+    const res = await fetch(`${FHIR_BASE}/Organization/${orgId}`);
+    const org = await res.json();
+    
+    if (!res.ok) {
+      alert(`載入組織失敗: ${JSON.stringify(org, null, 2)}`);
+      return;
+    }
+    
+    // 檢查是否為子組織（有 partOf）
+    if (!org.partOf) {
+      alert('❌ 此組織是父組織，請使用父組織表單進行編輯');
+      return;
+    }
+    
+    document.getElementById('orgChildName').value = org.name || '';
+    
+    // 設置父組織選項
+    const parentOrgId = org.partOf.reference.split('/')[1];
+    const parentSelect = document.getElementById('orgChildParentSelect');
+    for (let i = 0; i < parentSelect.options.length; i++) {
+      if (parentSelect.options[i].value === parentOrgId) {
+        parentSelect.selectedIndex = i;
+        break;
+      }
+    }
+    
+    alert(`✅ 已載入子組織資料: ${org.name}`);
+  } catch (err) {
+    alert(`❌ 載入組織失敗: ${err}`);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 重置父組織表單 ----------
+function resetParentForm() {
+  document.getElementById('orgParentId').value = '';
+  document.getElementById('orgParentName').value = '';
+  document.getElementById('orgParentResponse').textContent = '';
+}
+
+// ---------- 重置子組織表單 ----------
+function resetChildForm() {
+  document.getElementById('orgChildId').value = '';
+  document.getElementById('orgChildName').value = '';
+  const parentSelect = document.getElementById('orgChildParentSelect');
+  if (parentSelect.options.length > 0) {
+    parentSelect.selectedIndex = 0;
+  }
+  document.getElementById('orgChildResponse').textContent = '';
+}
+
+// ---------- 刪除資源 ----------
+async function deleteResource(resourceType, id) {
+  const resultBox = document.getElementById("queryDeleteResult");
+  if(!id) {
+    alert("請輸入資源 ID");
+    return;
+  }
+  
+  // 管理員確認刪除
+  if(!confirm(`確定要刪除 ${resourceType}/${id} 嗎？`)) {
+    return;
+  }
+  
+  const button = event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>刪除中...';
+    
+    // 對於組織，先刪除相關資源
+    if(resourceType === "Organization") {
+      // 刪除相關的 PractitionerRole
+      const prRes = await fetch(`${FHIR_BASE}/PractitionerRole?organization=Organization/${id}&_count=100`);
+      const prData = await prRes.json();
+      for(const entry of prData.entry || []) {
+        await fetch(`${FHIR_BASE}/PractitionerRole/${entry.resource.id}`, {method: "DELETE"});
+      }
+    }
+    
+    const res = await fetch(`${FHIR_BASE}/${resourceType}/${id}`, {method: "DELETE"});
+    if(res.ok) {
+      resultBox.innerHTML = `<div class="response-box success">✅ 刪除成功</div>`;
+    } else {
+      const data = await res.json();
+      resultBox.innerHTML = `<div class="response-box error">❌ 刪除失敗\n${JSON.stringify(data, null, 2)}</div>`;
+    }
+  } catch(err) {
+    resultBox.innerHTML = `<div class="response-box error">❌ 刪除失敗: ${err.message}</div>`;
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 載入父組織下拉 ----------
+async function loadOrgParentOptions() {
+  const select = document.getElementById("orgChildParentSelect");
+  select.innerHTML = "";
+  
+  try {
+    const res = await fetch(`${FHIR_BASE}/Organization?_count=100`);
+    const data = await res.json();
+    (data.entry || []).forEach(e => {
+      if(!e.resource.partOf) {
+        const opt = document.createElement("option");
+        opt.value = e.resource.id;
+        opt.textContent = `${e.resource.name} (${e.resource.id})`;
+        select.appendChild(opt);
+      }
+    });
+  } catch(err) {
+    console.error("載入父組織失敗", err);
+  }
+}
+
+// ---------- 載入 Person ----------
+async function loadPersons() {
+  const select = document.getElementById("personSelect");
+  select.innerHTML = "";
+
+  try {
+    const res = await fetch(`${FHIR_BASE}/Person?_count=100`);
+    const data = await res.json();
+    
+    // 過濾出還沒連結到 Practitioner 的 Person
+    const unlinkedPersons = (data.entry || []).filter(e => {
+      const p = e.resource;
+      return !p.link || !p.link.some(l => l.target?.reference?.startsWith("Practitioner/"));
+    });
+
+    unlinkedPersons.forEach(e => {
+      const p = e.resource;
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name?.[0]?.text + ` (${p.id})`;
+      select.appendChild(opt);
+    });
+
+    if(select.options.length > 0) {
+      updatePersonName(select.value);
+    }
+  } catch(err) {
+    console.error("載入 Person 失敗", err);
+  }
+}
+
+function updatePersonName(personId) {
+  const select = document.getElementById("personSelect");
+  const opt = Array.from(select.options).find(o => o.value === personId);
+  document.getElementById("practitionerName").value = opt ? opt.textContent.split(" (")[0] : "";
+}
+
+// ---------- Practitioner 下拉 ----------
+async function loadPractitioners() {
+  const select = document.getElementById("practitionerSelect");
+  select.innerHTML = "";
+  
+  try {
+    const res = await fetch(`${FHIR_BASE}/Practitioner?_count=100`);
+    const data = await res.json();
+    (data.entry || []).forEach(e => {
+      const p = e.resource;
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name?.[0]?.text + ` (${p.id})`;
+      select.appendChild(opt);
+    });
+  } catch(err) {
+    console.error("載入 Practitioner 失敗", err);
+  }
+}
+
+// ---------- 組織下拉 ----------
+async function loadOrgOptionsForRole() {
+  const select = document.getElementById("roleOrgSelect");
+  select.innerHTML = "";
+  
+  try {
+    const res = await fetch(`${FHIR_BASE}/Organization?_count=100`);
+    const data = await res.json();
+    (data.entry || []).forEach(e => {
+      const org = e.resource;
+      const opt = document.createElement("option");
+      opt.value = org.id;
+      opt.textContent = org.name + ` (${org.id})`;
+      select.appendChild(opt);
+    });
+  } catch(err) {
+    console.error("載入組織失敗", err);
+  }
+}
+
+// ---------- 更新職位名稱選項（動態篩選） ----------
+async function updateRoleOptions() {
+  const practitionerId = document.getElementById("practitionerSelect").value;
+  const orgId = document.getElementById("roleOrgSelect").value;
+  const roleSelect = document.getElementById("roleText");
+  
+  if (!practitionerId || !orgId) {
+    // 重置為所有選項
+    roleSelect.innerHTML = "";
+    allRoleOptions.forEach(role => {
+      const option = document.createElement("option");
+      option.value = role;
+      option.textContent = role;
+      roleSelect.appendChild(option);
+    });
+    return;
+  }
+  
+  try {
+    // 查詢該人員在該組織已有的職位
+    const res = await fetch(`${FHIR_BASE}/PractitionerRole?practitioner=Practitioner/${practitionerId}&organization=Organization/${orgId}&_count=100`);
+    const data = await res.json();
+    
+    // 收集已存在的職位
+    const existingRoles = new Set();
+    (data.entry || []).forEach(e => {
+      const role = e.resource;
+      if (role.code && role.code[0] && role.code[0].text) {
+        existingRoles.add(role.code[0].text);
+      }
+    });
+    
+    // 更新下拉選單，只顯示未分配的職位
+    roleSelect.innerHTML = "";
+    let hasAvailableRole = false;
+    
+    allRoleOptions.forEach(role => {
+      if (!existingRoles.has(role)) {
+        const option = document.createElement("option");
+        option.value = role;
+        option.textContent = role;
+        roleSelect.appendChild(option);
+        hasAvailableRole = true;
+      }
+    });
+    
+    // 如果沒有可用的職位，顯示提示
+    if (!hasAvailableRole) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "該人員在該組織已擁有所有職位";
+      option.disabled = true;
+      option.selected = true;
+      roleSelect.appendChild(option);
+      document.querySelector('#roleForm button[type="submit"]').disabled = true;
+    } else {
+      document.querySelector('#roleForm button[type="submit"]').disabled = false;
+    }
+    
+  } catch(err) {
+    console.error("查詢現有職位失敗", err);
+    // 發生錯誤時重置為所有選項
+    roleSelect.innerHTML = "";
+    allRoleOptions.forEach(role => {
+      const option = document.createElement("option");
+      option.value = role;
+      option.textContent = role;
+      roleSelect.appendChild(option);
+    });
+  }
+}
+
+// ---------- 刪除 Practitioner ----------
+async function deletePractitioner(practitionerId) {
+  const resultBox = document.getElementById("queryDeleteResult");
+  if(!practitionerId) {
+    alert("請輸入 Practitioner ID");
+    return;
+  }
+  
+  // 管理員確認刪除
+  if(!confirm(`確定要刪除 Practitioner/${practitionerId} 及其相關資源嗎？`)) {
+    return;
+  }
+  
+  const button = event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>刪除中...';
+
+    // 1. 刪除 PractitionerRole
+    const prRes = await fetch(`${FHIR_BASE}/PractitionerRole?practitioner=Practitioner/${practitionerId}&_count=100`);
+    const prData = await prRes.json();
+    for(const entry of prData.entry || []) {
+      await fetch(`${FHIR_BASE}/PractitionerRole/${entry.resource.id}`, {method: "DELETE"});
+    }
+
+    // 2. 移除 Person.link
+    const personRes = await fetch(`${FHIR_BASE}/Person?_count=100`);
+    const personData = await personRes.json();
+    for(const entry of personData.entry || []) {
+      const person = entry.resource;
+      if(person.link?.some(l => l.target.reference === `Practitioner/${practitionerId}`)) {
+        person.link = person.link.filter(l => l.target.reference !== `Practitioner/${practitionerId}`);
+        await fetch(`${FHIR_BASE}/Person/${person.id}`, {
+          method: "PUT",
+          headers: {"Content-Type": "application/fhir+json"},
+          body: JSON.stringify(person)
+        });
+      }
+    }
+
+    // 3. 刪除 Practitioner
+    const res = await fetch(`${FHIR_BASE}/Practitioner/${practitionerId}`, {method: "DELETE"});
+    if(res.ok) {
+      resultBox.innerHTML = `<div class="response-box success">✅ Practitioner ${practitionerId} 刪除完成</div>`;
+    } else {
+      const data = await res.json();
+      resultBox.innerHTML = `<div class="response-box error">❌ 刪除 Practitioner 失敗\n${JSON.stringify(data, null, 2)}</div>`;
+    }
+  } catch(err) {
+    resultBox.innerHTML = `<div class="response-box error">❌ 刪除失敗: ${err.message}</div>`;
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 刷新所有資料 ----------
+async function refreshAllData() {
+  const button = event.target;
+  const originalText = button.innerHTML;
+  
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>刷新中...';
+    
+    await Promise.all([
+      loadOrgParentOptions(),
+      loadPersons(),
+      loadPractitioners(),
+      loadOrgOptionsForRole()
+    ]);
+    
+    // 重置職位選項
+    updateRoleOptions();
+    
+    document.getElementById("queryDeleteResult").innerHTML = '<div class="response-box success">✅ 所有資料已刷新</div>';
+  } catch(err) {
+    console.error("刷新資料失敗", err);
+    document.getElementById("queryDeleteResult").innerHTML = `<div class="response-box error">❌ 刷新資料失敗: ${err.message}</div>`;
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+// ---------- 事件監聽 ----------
+document.getElementById('orgParentForm').addEventListener('submit', e => {
+  e.preventDefault();
+  sendToFhir("Organization", 
+    document.getElementById('orgParentId').value, 
+    {
+      resourceType: "Organization",
+      id: document.getElementById('orgParentId').value,
+      name: document.getElementById('orgParentName').value,
+      type: [{
+        coding: [{
+          system: "http://hl7.org/fhir/organization-type",
+          code: "hospital",
+          display: "Hospital"
+        }]
+      }]
+    },
+    "orgParentResponse"
+  );
+  setTimeout(loadOrgParentOptions, 500);
+});
+
+document.getElementById('orgChildForm').addEventListener('submit', e => {
+  e.preventDefault();
+  sendToFhir("Organization", 
+    document.getElementById('orgChildId').value, 
+    {
+      resourceType: "Organization",
+      id: document.getElementById('orgChildId').value,
+      name: document.getElementById('orgChildName').value,
+      partOf: {reference: "Organization/" + document.getElementById('orgChildParentSelect').value},
+      type: [{
+        coding: [{
+          system: "http://hl7.org/fhir/organization-type",
+          code: "hospital",
+          display: "Hospital"
+        }]
+      }]
+    },
+    "orgChildResponse"
+  );
+});
+
+document.getElementById('practitionerForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const personId = document.getElementById("personSelect").value;
+  const name = document.getElementById("practitionerName").value;
+  const resBox = document.getElementById("practitionerResponse");
+  const button = e.target.querySelector('button[type="submit"]');
+  const originalText = button.innerHTML;
+
+  if (!personId) {
+    alert("請選擇一個 Person");
+    return;
+  }
+
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>建立中...';
+
+    // 建立 Practitioner
+    const res = await fetch(`${FHIR_BASE}/Practitioner`, {
+      method: "POST",
+      headers: {"Content-Type": "application/fhir+json"},
+      body: JSON.stringify({
+        resourceType: "Practitioner",
+        name: [{text: name}]
+      })
+    });
+    
+    const data = await res.json();
+    if(!res.ok) throw data;
+    const practitionerId = data.id;
+
+    // 連結 Person
+    const personRes = await fetch(`${FHIR_BASE}/Person/${personId}`);
+    const personData = await personRes.json();
+    if(!personData.link) personData.link = [];
+    personData.link.push({
+      target: {reference: `Practitioner/${practitionerId}`},
+      type: "seealso"
+    });
+    
+    await fetch(`${FHIR_BASE}/Person/${personId}`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/fhir+json"},
+      body: JSON.stringify(personData)
+    });
+
+    resBox.textContent = `✅ Practitioner 建立完成，ID: ${practitionerId}`;
+    resBox.className = 'response-box success';
+    
+    // 刷新 Practitioner 列表
+    loadPractitioners();
+    // 刷新 Person 列表（因為該 Person 已被連結）
+    loadPersons();
+  } catch(err) {
+    resBox.textContent = `❌ 失敗: ${JSON.stringify(err, null, 2)}`;
+    resBox.className = 'response-box error';
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+});
+
+document.getElementById('roleForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const practitionerId = document.getElementById("practitionerSelect").value;
+  const orgId = document.getElementById("roleOrgSelect").value;
+  const roleText = document.getElementById("roleText").value;
+  const resBox = document.getElementById("roleResponse");
+  const button = e.target.querySelector('button[type="submit"]');
+  const originalText = button.innerHTML;
+
+  if (!practitionerId || !orgId) {
+    alert("請選擇 Practitioner 和所屬組織");
+    return;
+  }
+
+  if (!roleText) {
+    alert("請選擇有效的職位名稱");
+    return;
+  }
+
+  try {
+    // 設置載入狀態
+    button.disabled = true;
+    button.innerHTML = '<span class="loading"></span>建立中...';
+
+    // 檢查是否重複（再次確認）
+    const checkRes = await fetch(`${FHIR_BASE}/PractitionerRole?practitioner=Practitioner/${practitionerId}&organization=Organization/${orgId}`);
+    const checkData = await checkRes.json();
+    const exists = (checkData.entry || []).some(e => 
+      e.resource.code?.[0]?.text === roleText
+    );
+    
+    if(exists) {
+      resBox.textContent = "⚠️ 該人員已在此組織擁有此職位";
+      resBox.className = 'response-box error';
+      // 刷新職位選項
+      updateRoleOptions();
+      return;
+    }
+
+    // 建立 PractitionerRole
+    const role = {
+      resourceType: "PractitionerRole",
+      practitioner: {reference: `Practitioner/${practitionerId}`},
+      organization: {reference: `Organization/${orgId}`},
+      code: [{text: roleText}]
+    };
+    
+    const res = await fetch(`${FHIR_BASE}/PractitionerRole`, {
+      method: "POST",
+      headers: {"Content-Type": "application/fhir+json"},
+      body: JSON.stringify(role)
+    });
+    
+    const data = await res.json();
+    if(!res.ok) throw data;
+    
+    resBox.textContent = `✅ PractitionerRole 建立完成，ID: ${data.id}`;
+    resBox.className = 'response-box success';
+    
+    // 更新職位選項（因為新增了職位，可能需要過濾掉已分配的職位）
+    updateRoleOptions();
+  } catch(err) {
+    resBox.textContent = `❌ 失敗: ${JSON.stringify(err, null, 2)}`;
+    resBox.className = 'response-box error';
+  } finally {
+    // 恢復按鈕狀態
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+});
+
+// 新增按鈕事件監聽
+document.getElementById("btnLoadParentOrg").addEventListener("click", loadParentOrganization);
+document.getElementById("btnLoadChildOrg").addEventListener("click", loadChildOrganization);
+document.getElementById("btnResetParentForm").addEventListener("click", resetParentForm);
+document.getElementById("btnResetChildForm").addEventListener("click", resetChildForm);
+
+document.getElementById("personSelect").addEventListener("change", e => updatePersonName(e.target.value));
+
+// 新增：當選擇 Practitioner 或組織時，更新職位選項
+document.getElementById("practitionerSelect").addEventListener("change", updateRoleOptions);
+document.getElementById("roleOrgSelect").addEventListener("change", updateRoleOptions);
+
+document.getElementById("btnQueryResource").addEventListener("click", () => {
+  const type = document.getElementById("queryResourceType").value;
+  const id = document.getElementById("queryResourceId").value.trim();
+  queryResource(type, id);
+});
+
+document.getElementById("btnDeleteResource").addEventListener("click", () => {
+  const type = document.getElementById("queryResourceType").value;
+  const id = document.getElementById("queryResourceId").value.trim();
+
+  if(type === "Practitioner") {
+    deletePractitioner(id);
+  } else {
+    deleteResource(type, id);
+  }
+});
+
+document.getElementById("btnRefreshAll").addEventListener("click", refreshAllData);
+
+// ---------- 初始載入 ----------
+document.addEventListener('DOMContentLoaded', () => {
+  refreshAllData();
+});
+</script>
+</body>
+</html>
