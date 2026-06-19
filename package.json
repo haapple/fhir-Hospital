@@ -1,0 +1,36 @@
+{
+  "name": "fhir-hospital-management-system",
+  "version": "0.1.0",
+  "description": "A FHIR-based healthcare management system with telemedicine, prescription management, and real-time communication",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "fhir",
+    "healthcare",
+    "telemedicine",
+    "prescription",
+    "hospital-management",
+    "medical-system"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.1.0",
+    "node-fetch": "^2.7.0",
+    "nodemailer": "^6.9.7"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

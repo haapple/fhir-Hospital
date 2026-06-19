@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>選擇您的角色</title>
+  <style>
+    body { 
+      font-family: 'Segoe UI', Arial, sans-serif; 
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh; 
+      margin: 0; 
+      color: #333;
+    }
+    .container { 
+      background: rgba(255, 255, 255, 0.95); 
+      padding: 2rem 3rem; 
+      border-radius: 12px; 
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2); 
+      text-align: center; 
+      backdrop-filter: blur(10px);
+      max-width: 500px;
+      width: 90%;
+    }
+    h1 { 
+      color: #333; 
+      margin-bottom: 1.5rem; 
+      font-weight: 600;
+    }
+    .user-info {
+      background: rgba(0, 123, 255, 0.1);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .user-info p {
+      margin: 0.5rem 0;
+      color: #555;
+    }
+    #rolesList { 
+      list-style-type: none; 
+      padding: 0; 
+      margin: 0; 
+    }
+    #rolesList li { 
+      margin-bottom: 1rem; 
+    }
+    .role-button { 
+      display: block; 
+      width: 100%; 
+      padding: 1.2rem; 
+      font-size: 1rem; 
+      color: white; 
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      border: none; 
+      border-radius: 8px; 
+      cursor: pointer; 
+      transition: all 0.3s ease;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+    .role-button:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+    }
+    .role-button:active {
+      transform: translateY(0);
+    }
+    .role-button .org-name { 
+      font-weight: bold; 
+      font-size: 1.1em;
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    .role-button .job-title { 
+      font-size: 0.9em; 
+      opacity: 0.9; 
+      display: block;
+    }
+    .role-button .role-type {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      background: rgba(255,255,255,0.2);
+      padding: 0.2rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.8em;
+    }
+    #message { 
+      margin-top: 1rem; 
+      padding: 0.75rem;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .error { 
+      background: rgba(244, 67, 54, 0.1); 
+      color: #d32f2f;
+      border: 1px solid rgba(244, 67, 54, 0.2);
+    }
+    .success { 
+      background: rgba(76, 175, 80, 0.1); 
+      color: #388e3c;
+      border: 1px solid rgba(76, 175, 80, 0.2);
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .back-button {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: 0.5rem 1rem;
+      background: #6c757d;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      transition: background 0.2s;
+    }
+    .back-button:hover {
+      background: #5a6268;
+    }
+    .role-icon {
+      margin-right: 8px;
+      font-size: 1.2em;
+    }
+    .single-role-notice {
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      color: #856404;
+    }
+    .auto-redirect-notice {
+      background: rgba(40, 167, 69, 0.1);
+      border: 1px solid rgba(40, 167, 69, 0.3);
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      color: #155724;
+    }
+    .countdown {
+      font-weight: bold;
+      color: #155724;
+    }
+    .admin-notice {
+      background: rgba(220, 53, 69, 0.1);
+      border: 1px solid rgba(220, 53, 69, 0.3);
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      color: #721c24;
+    }
+    .cancel-redirect {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.3rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 10px;
+      font-size: 0.8em;
+    }
+    .cancel-redirect:hover {
+      background: #c82333;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>選擇您的職業身份</h1>
+    
+    <div class="user-info" id="userInfo" style="display: none;">
+      <p><strong>歡迎！</strong> 請選擇您要使用的角色：</p>
+    </div>
+    
+    <div id="rolesList">
+      <li>載入中...</li>
+    </div>
+    
+    <div id="message"></div>
+    <a href="/login.html" class="back-button">返回登入</a>
+  </div>
+
+  <script>
+let autoRedirectTimer = null;
+let countdown = 5; // 倒數秒數
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const rolesList = document.getElementById('rolesList');
+  const messageDiv = document.getElementById('message');
+  const userInfo = document.getElementById('userInfo');
+
+  try {
+    // 先檢查是否為管理員
+    const adminCheck = await fetch('/api/check-admin', { 
+      credentials: 'include' 
+    });
+    
+    if (adminCheck.ok) {
+      const adminData = await adminCheck.json();
+      if (adminData.isAdmin) {
+        // 如果是管理員，直接跳轉到 Hospital.html
+        showMessage('👑 偵測到管理員身份，正在導向管理後台...', 'success');
+        setTimeout(() => {
+          window.location.href = '/Hospital.html';
+        }, 1500);
+        return;
+      }
+    }
+
+    // 非管理員的原有流程
+    const userRes = await fetch('/api/user-info', { 
+      credentials: 'include' 
+    });
+    
+    let userName = '用戶';
+    if (userRes.ok) {
+      const userData = await userRes.json();
+      userName = userData.name || '用戶';
+    }
+
+    userInfo.innerHTML = `<p><strong>歡迎，${escapeHtml(userName)}！</strong> 請選擇您要使用的角色：</p>`;
+    userInfo.style.display = 'block';
+
+    // 向後端取得該使用者的所有 PractitionerRole
+    const res = await fetch('/api/practitioner/roles', { 
+      credentials: 'include' 
+    });
+
+    if (res.status === 401) {
+      showMessage('請先登入系統', 'error');
+      setTimeout(() => {
+        window.location.href = '/login.html';
+      }, 2000);
+      return;
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || '無法載入您的角色資訊');
+    }
+
+    const roles = await res.json();
+    rolesList.innerHTML = ''; // 清掉「載入中...」
+
+    if (!roles || roles.length === 0) {
+      rolesList.innerHTML = '<li>您尚未被指派任何角色。</li>';
+      showMessage('您目前沒有任何可用的角色，請聯繫管理員。', 'error');
+      return;
+    }
+
+    // 顯示角色數量信息
+    userInfo.innerHTML += `<p>您有 <strong>${roles.length}</strong> 個可用角色</p>`;
+
+    // 為每個角色建立一個按鈕
+    roles.forEach(role => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.className = 'role-button';
+      
+      // 根據角色類型選擇圖標
+      const icon = getRoleIcon(role.roleType);
+      
+      button.innerHTML = `
+        <span class="role-icon">${icon}</span>
+        <span class="org-name">${escapeHtml(role.organizationName || role.organizationId || '未知機構')}</span>
+        <span class="job-title">${escapeHtml(role.jobTitle || role.roleType || '未指定職稱')}</span>
+        <span class="role-type">${getRoleTypeDisplayName(role.roleType)}</span>
+      `;
+
+      button.addEventListener('click', () => {
+        // 如果存在自動導向計時器，清除它
+        if (autoRedirectTimer) {
+          clearTimeout(autoRedirectTimer);
+          autoRedirectTimer = null;
+        }
+        selectRole(role);
+      });
+      
+      li.appendChild(button);
+      rolesList.appendChild(li);
+    });
+
+    // 如果只有一個角色，顯示自動導向提示，但仍允許手動選擇
+    if (roles.length === 1) {
+      const notice = document.createElement('div');
+      notice.className = 'auto-redirect-notice';
+      notice.id = 'autoRedirectNotice';
+      notice.innerHTML = `偵測到您只有一個角色，將在 <span class="countdown">${countdown}</span> 秒後自動導向...
+        <button class="cancel-redirect" onclick="cancelAutoRedirect()">取消自動導向</button>`;
+      rolesList.parentNode.insertBefore(notice, rolesList);
+      
+      // 開始倒數計時
+      startAutoRedirect(roles[0]);
+    }
+
+  } catch (err) {
+    console.error('載入角色失敗:', err);
+    rolesList.innerHTML = '';
+    showMessage(`錯誤: ${err.message}`, 'error');
+  }
+});
+
+// 開始自動導向倒數計時
+function startAutoRedirect(role) {
+  const countdownElement = document.querySelector('.countdown');
+  
+  autoRedirectTimer = setInterval(() => {
+    countdown--;
+    if (countdownElement) {
+      countdownElement.textContent = countdown;
+    }
+    
+    if (countdown <= 0) {
+      clearInterval(autoRedirectTimer);
+      autoRedirectTimer = null;
+      selectRole(role);
+    }
+  }, 1000);
+}
+
+// 取消自動導向
+function cancelAutoRedirect() {
+  if (autoRedirectTimer) {
+    clearInterval(autoRedirectTimer);
+    autoRedirectTimer = null;
+  }
+  
+  const notice = document.getElementById('autoRedirectNotice');
+  if (notice) {
+    notice.innerHTML = '已取消自動導向，請手動選擇角色。';
+    notice.className = 'single-role-notice';
+  }
+}
+
+// 選擇角色的函數
+async function selectRole(role) {
+  const messageDiv = document.getElementById('message');
+  
+  try {
+    showMessage('正在設定角色...', 'success');
+    
+    // 禁用所有按鈕防止重複點擊
+    document.querySelectorAll('.role-button').forEach(btn => {
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+    });
+
+    // 如果存在自動導向計時器，清除它
+    if (autoRedirectTimer) {
+      clearTimeout(autoRedirectTimer);
+      autoRedirectTimer = null;
+    }
+
+    // 隱藏自動導向提示
+    const autoRedirectNotice = document.getElementById('autoRedirectNotice');
+    if (autoRedirectNotice) {
+      autoRedirectNotice.style.display = 'none';
+    }
+
+    // 呼叫後端設定當前角色
+    const selectRes = await fetch('/api/practitioner/select-role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        organizationId: role.organizationId,
+        practitionerRoleId: role.practitionerRoleId,
+        practitionerId: role.practitionerId,
+        roleType: role.roleType
+      })
+    });
+
+    if (!selectRes.ok) {
+      const err = await selectRes.json().catch(() => ({}));
+      throw new Error(err.error || '角色設定失敗');
+    }
+
+    showMessage(`角色設定成功！即將進入 ${getRoleTypeDisplayName(role.roleType)}...`, 'success');
+
+    // 等待一下讓用戶看到成功訊息
+    setTimeout(() => {
+      // 根據角色類型導向對應頁面
+      redirectByRoleType(role.roleType);
+    }, 1500);
+
+  } catch (err) {
+    console.error('選擇角色失敗:', err);
+    showMessage('選擇角色失敗: ' + err.message, 'error');
+    
+    // 重新啟用按鈕
+    document.querySelectorAll('.role-button').forEach(btn => {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    });
+  }
+}
+
+// 根據角色類型跳轉到對應頁面
+function redirectByRoleType(roleType) {
+  const normalizedType = (roleType || '').toLowerCase();
+  
+  switch (normalizedType) {
+    case 'doctor':
+      window.location.href = '/doctor.html';
+      break;
+    case 'pharmacist':
+      // ✅ 重要修改：藥師現在導向到 MedicationRequest 頁面
+      window.location.href = '/pharmacist-medication.html';
+      break;
+    case 'nurse':
+      window.location.href = '/nurse.html';
+      break;
+    case 'assistant':
+      window.location.href = '/assistant.html';
+      break;
+    case 'admin':  // 管理員角色
+      window.location.href = '/Hospital.html';
+      break;
+    default:
+      window.location.href = '/practitioner-main.html';
+      break;
+  }
+}
+
+// 顯示訊息
+function showMessage(message, type = '') {
+  const messageDiv = document.getElementById('message');
+  messageDiv.textContent = message;
+  messageDiv.className = type;
+  messageDiv.style.display = 'block';
+}
+
+// 根據角色類型獲取圖標
+function getRoleIcon(roleType) {
+  const normalizedType = (roleType || '').toLowerCase();
+  
+  switch (normalizedType) {
+    case 'doctor':
+      return '👨‍⚕️';
+    case 'pharmacist':
+      return '💊'; // 改為藥丸圖標，更符合藥師身份
+    case 'nurse':
+      return '👩‍⚕️';
+    case 'assistant':
+      return '👨‍💼';
+    case 'admin':  // 管理員特殊圖標
+      return '👑';
+    default:
+      return '👤';
+  }
+}
+
+// 獲取角色類型的顯示名稱
+function getRoleTypeDisplayName(roleType) {
+  const normalizedType = (roleType || '').toLowerCase();
+  
+  const roleNames = {
+    'doctor': '醫師系統',
+    'pharmacist': '藥師審核系統', // 更新顯示名稱
+    'nurse': '護理師系統',
+    'assistant': '助理系統',
+    'admin': '👑 系統管理員',  // 管理員特殊標記
+    'other': '其他系統'
+  };
+  
+  return roleNames[normalizedType] || roleType || '其他系統';
+}
+
+// HTML 轉義函數，防止 XSS
+function escapeHtml(unsafe) {
+  if (unsafe === null || unsafe === undefined) return '';
+  return unsafe
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+  </script>
+</body>
+</html>

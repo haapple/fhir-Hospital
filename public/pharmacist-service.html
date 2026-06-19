@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>藥師審核系統 - ServiceRequest</title>
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <div class="user-info">
+    <strong>🚚 藥師審核系統 - ServiceRequest</strong>
+    <span id="currentOrganization">載入中...</span>
+    <span id="currentUser">載入中...</span>
+  </div>
+  <div class="nav-buttons">
+    <a href="pharmacist-medication.html" class="nav-btn">💊 返回 MedicationRequest 頁面</a>
+    <button class="logout-btn" onclick="logout()">登出系統</button>
+  </div>
+</div>
+
+<h1 class="main-title">ServiceRequest 處理系統</h1>
+
+<div class="container">
+  <!-- 統計資訊 -->
+  <div class="stats-container">
+    <div class="stat-card">
+      <div class="stat-label">待處理配送</div>
+      <div class="stat-number" id="pendingSRCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">已建立 SupplyRequest</div>
+      <div class="stat-number" id="completedSRCount">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">通知功能</div>
+      <button class="btn btn-communication" onclick="viewPharmacistCommunications()" style="margin-top: 10px;">
+        📨 查看配送通知
+      </button>
+    </div>
+  </div>
+
+  <!-- 訊息區域 -->
+  <div id="errorMessage" class="message error-message" style="display: none;"></div>
+  <div id="successMessage" class="message success-message" style="display: none;"></div>
+  <div id="infoMessage" class="message info-message" style="display: none;"></div>
+
+  <!-- ServiceRequest 清單 -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">🚚 ServiceRequest 清單</h2>
+      <div>
+        <button class="btn" onclick="loadServiceRequests()">
+          🔄 刷新資料
+        </button>
+      </div>
+    </div>
+    <div class="table-container">
+      <table id="srTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>病人</th>
+            <th>藥品名稱</th>
+            <th>配送備註</th>
+            <th>對應 MedicationRequest ID</th>
+            <th>配送目標 (deliverTo)</th>
+            <th>配送設定</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 配送通知 Modal -->
+<div id="communicationModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title">📨 配送通知記錄</h2>
+      <button class="modal-close" onclick="closeCommunicationModal()">×</button>
+    </div>
+    <div id="communicationList"></div>
+  </div>
+</div>
+
+<script>
+// 除錯模式控制
+const DEBUG_MODE = true;
+
+// 除錯日誌函數
+function debugLog(...args) {
+  if (DEBUG_MODE) {
+    console.log(...args);
+  }
+}
+
+const hospitalFhirUrl = "http://203.64.84.209:8080/fhir";
+const logisticsFhirUrl = "http://203.64.84.204:8080/fhir";
+let currentPractitioner = null;
+let logisticsCompanies = [];
+let communityStores = [];
+
+// -------------------- 顯示訊息函數 --------------------
+function showError(message) {
+  const errorDiv = document.getElementById('errorMessage');
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+  document.getElementById('successMessage').style.display = 'none';
+  document.getElementById('infoMessage').style.display = 'none';
+}
+
+function showSuccess(message) {
+  const successDiv = document.getElementById('successMessage');
+  successDiv.textContent = message;
+  successDiv.style.display = 'block';
+  document.getElementById('errorMessage').style.display = 'none';
+  document.getElementById('infoMessage').style.display = 'none';
+}
+
+function showInfo(message) {
+  const infoDiv = document.getElementById('infoMessage');
+  infoDiv.textContent = message;
+  infoDiv.style.display = 'block';
+  document.getElementById('errorMessage').style.display = 'none';
+  document.getElementById('successMessage').style.display = 'none';
+}
+
+function hideMessages() {
+  document.getElementById('errorMessage').style.display = 'none';
+  document.getElementById('successMessage').style.display = 'none';
+  document.getElementById('infoMessage').style.display = 'none';
+}
+
+// -------------------- 從 cookie 取值 --------------------
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+// -------------------- 登出功能 --------------------
+function logout() {
+  const cookies = document.cookie.split(";");
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i];
+    const eqPos = cookie.indexOf("=");
+    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+    if (name === "token" || name === "selectedRole") {
+      document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+  }
+  window.location.href = "/login.html";
+}
+
+// ---------- 載入登入藥師資料 ----------
+async function loadCurrentPractitioner() {
+  try {
+    const roleCookie = getCookie("selectedRole");
+    if (!roleCookie) {
+      showError("尚未選擇角色，請重新登入");
+      setTimeout(() => {
+        window.location.href = "/choose-organization.html";
+      }, 2000);
+      return;
+    }
+
+    currentPractitioner = JSON.parse(roleCookie);
+
+    if (currentPractitioner.roleType !== "pharmacist") {
+      showError("您選擇的角色不是藥師，無法進入此頁面");
+      setTimeout(() => {
+        window.location.href = "/choose-organization.html";
+      }, 2000);
+      return;
+    }
+
+    await updateUserInfoDisplay();
+    await loadLogisticsCompanies();
+    await loadCommunityStores();
+    hideMessages();
+
+  } catch (err) {
+    debugLog("載入藥師資料失敗:", err);
+    showError("載入藥師資料失敗: " + err.message);
+  }
+}
+
+// -------------------- 更新頁面使用者資訊顯示 --------------------
+async function updateUserInfoDisplay() {
+  if (!currentPractitioner) return;
+  
+  let orgName = "未知機構";
+  
+  if (currentPractitioner.organizationName && currentPractitioner.organizationName.startsWith('Organization/')) {
+    const orgId = currentPractitioner.organizationName.replace('Organization/', '');
+    try {
+      const orgRes = await fetch(`${hospitalFhirUrl}/Organization/${orgId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgName = orgData.name || orgId;
+      } else {
+        orgName = orgId;
+      }
+    } catch (err) {
+      debugLog("獲取機構名稱失敗:", err);
+      orgName = orgId;
+    }
+  } else if (currentPractitioner.organizationName) {
+    orgName = currentPractitioner.organizationName;
+  } else if (currentPractitioner.organizationId) {
+    try {
+      const orgRes = await fetch(`${hospitalFhirUrl}/Organization/${currentPractitioner.organizationId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgName = orgData.name || currentPractitioner.organizationId;
+      } else {
+        orgName = currentPractitioner.organizationId;
+      }
+    } catch (err) {
+      debugLog("獲取機構名稱失敗:", err);
+      orgName = currentPractitioner.organizationId;
+    }
+  }
+  
+  let pharmacistName = "未知藥師";
+  try {
+    const pracRes = await fetch(`${hospitalFhirUrl}/Practitioner/${currentPractitioner.practitionerId}`);
+    if (pracRes.ok) {
+      const practitioner = await pracRes.json();
+      if (practitioner.name && practitioner.name[0]) {
+        const name = practitioner.name[0];
+        if (name.text) {
+          pharmacistName = name.text;
+        } else {
+          const family = name.family || '';
+          const given = name.given ? name.given.join(' ') : '';
+          pharmacistName = `${family} ${given}`.trim();
+        }
+      }
+    }
+  } catch (err) {
+    debugLog("獲取藥師名稱失敗:", err);
+  }
+  
+  document.getElementById("currentOrganization").textContent = orgName;
+  document.getElementById("currentUser").textContent = `${pharmacistName} (${currentPractitioner.jobTitle || '藥師'})`;
+}
+
+// ---------- 從物流伺服器載入物流公司 Organization 列表 ----------
+async function loadLogisticsCompanies() {
+  try {
+    debugLog("開始載入物流公司 Organization 列表...");
+    const res = await fetch(`${logisticsFhirUrl}/Organization`);
+    if (!res.ok) {
+      throw new Error(`載入 Organization 失敗: ${res.status}`);
+    }
+    
+    const bundle = await res.json();
+    logisticsCompanies = [];
+    
+    if (bundle.entry && bundle.entry.length > 0) {
+      bundle.entry.forEach(entry => {
+        const org = entry.resource;
+        
+        const isLogisticsCompany = org.type && org.type.some(type => 
+          type.coding && type.coding.some(coding => 
+            coding.code === "Logistics Company"
+          )
+        );
+        
+        const isActive = org.active !== false;
+        
+        if (isLogisticsCompany && isActive) {
+          logisticsCompanies.push({
+            id: org.id,
+            name: org.name || `物流公司 ${org.id}`,
+            type: "Logistics Company",
+            active: org.active
+          });
+        }
+      });
+      
+      debugLog("找到的物流公司:", logisticsCompanies);
+    } else {
+      debugLog("物流伺服器沒有找到任何 Organization");
+      showInfo("物流伺服器沒有找到可用的物流公司");
+    }
+    
+  } catch (err) {
+    debugLog("載入物流公司 Organization 列表失敗:", err);
+    showError("載入物流公司列表失敗: " + err.message);
+  }
+}
+
+// ---------- 從物流伺服器載入社區商店 Organization 列表 ----------
+async function loadCommunityStores() {
+  try {
+    debugLog("開始載入社區商店 Organization 列表...");
+    const res = await fetch(`${logisticsFhirUrl}/Organization`);
+    if (!res.ok) {
+      throw new Error(`載入 Organization 失敗: ${res.status}`);
+    }
+    
+    const bundle = await res.json();
+    communityStores = [];
+    
+    if (bundle.entry && bundle.entry.length > 0) {
+      bundle.entry.forEach(entry => {
+        const org = entry.resource;
+        
+        const isCommunityStore = org.type && org.type.some(type => 
+          type.coding && type.coding.some(coding => 
+            coding.code === "Community Store"
+          )
+        );
+        
+        const isActive = org.active !== false;
+        
+        if (isCommunityStore && isActive) {
+          communityStores.push({
+            id: org.id,
+            name: org.name || `社區商店 ${org.id}`,
+            type: "Community Store",
+            active: org.active
+          });
+        }
+      });
+      
+      debugLog("找到的社區商店:", communityStores);
+    } else {
+      debugLog("物流伺服器沒有找到任何社區商店");
+    }
+    
+  } catch (err) {
+    debugLog("載入社區商店 Organization 列表失敗:", err);
+  }
+}
+
+// ---------- 從物流伺服器載入特定 Organization ----------
+async function loadOrganizationFromLogistics(orgId) {
+  try {
+    debugLog(`從物流端載入 Organization ${orgId}...`);
+    const res = await fetch(`${logisticsFhirUrl}/Organization/${orgId}`);
+    
+    if (res.ok) {
+      const orgData = await res.json();
+      
+      let orgType = "未知類型";
+      if (orgData.type && orgData.type[0] && orgData.type[0].coding && orgData.type[0].coding[0]) {
+        orgType = orgData.type[0].coding[0].code || "未知類型";
+      }
+      
+      debugLog(`✅ 從物流端找到 Organization ${orgId}:`, orgData);
+      return {
+        id: orgData.id,
+        name: orgData.name || `組織 ${orgData.id}`,
+        type: orgType,
+        active: orgData.active !== false
+      };
+    } else {
+      debugLog(`⚠️ 物流端沒有找到 Organization ${orgId}`);
+      return null;
+    }
+  } catch (err) {
+    debugLog(`載入物流端 Organization ${orgId} 失敗:`, err);
+    return null;
+  }
+}
+
+// ---------- 檢查 MedicationRequest 有效性 ----------
+function isMedicationRequestValid(medId, medStatusMap, practitionerId) {
+  const medInfo = medStatusMap[medId];
+  if (!medInfo) return false;
+  
+  // 檢查狀態
+  if (medInfo.status !== "completed") return false;
+  
+  // 檢查藥師匹配
+  let performerRef = null;
+  if (Array.isArray(medInfo.performer)) {
+    performerRef = medInfo.performer[0]?.reference;
+  } else if (medInfo.performer && medInfo.performer.reference) {
+    performerRef = medInfo.performer.reference;
+  }
+  
+  return performerRef && performerRef.includes(practitionerId);
+}
+
+// ---------- 載入 ServiceRequest 資料 ----------
+async function loadServiceRequests() {
+  try {
+    debugLog("開始載入 ServiceRequest 資料...");
+    
+    const srBundle = await fetch(`${hospitalFhirUrl}/ServiceRequest`).then(r => r.json());
+    const medBundle = await fetch(`${hospitalFhirUrl}/MedicationRequest`).then(r => r.json());
+
+    const srTbody = document.querySelector("#srTable tbody");
+    srTbody.innerHTML = "";
+
+    let pendingSRCount = 0;
+    let completedSRCount = 0;
+
+    const medStatusMap = {};
+    if (medBundle.entry) {
+      medBundle.entry.forEach(entry => {
+        const med = entry.resource;
+        medStatusMap[med.id] = {
+          status: med.status,
+          performer: med.performer,
+          medicationName: med.medicationCodeableConcept?.text || "未知藥品"
+        };
+      });
+    }
+
+    if (srBundle.entry) {
+      for (const entry of srBundle.entry) {
+        const sr = entry.resource;
+        const srId = sr.id;
+
+        debugLog(`處理 ServiceRequest ${srId}:`, sr);
+
+        const medIds = sr.basedOn?.map(b => b.reference.replace("MedicationRequest/", "")) || [];
+        
+        if (medIds.length === 0) {
+          debugLog(`跳過 ServiceRequest ${srId}，沒有對應的 MedicationRequest`);
+          continue;
+        }
+        
+        // 使用優化的檢查函數
+        const isMedValid = medIds.some(medId => 
+          isMedicationRequestValid(medId, medStatusMap, currentPractitioner.practitionerId)
+        );
+        
+        if (!isMedValid) {
+          debugLog(`跳過 ServiceRequest ${srId}，對應的 MedicationRequest 不符合條件`);
+          continue;
+        }
+
+        pendingSRCount++;
+
+        const row = document.createElement("tr");
+        
+        const hospitalOrgId = currentPractitioner.organizationId;
+        let hospitalOrgName = "醫院組織";
+        
+        try {
+          const hospitalOrgRes = await fetch(`${hospitalFhirUrl}/Organization/${hospitalOrgId}`);
+          if (hospitalOrgRes.ok) {
+            const hospitalOrgData = await hospitalOrgRes.json();
+            hospitalOrgName = hospitalOrgData.name || hospitalOrgId;
+          }
+        } catch (err) {
+          debugLog("獲取醫院組織名稱失敗:", err);
+        }
+
+        const medicationName = medStatusMap[medIds[0]]?.medicationName || "未知藥品";
+        
+        const patientId = sr.subject?.reference.replace("Patient/", "") || "";
+        let patientName = `病人 ${patientId}`;
+        let patientEmail = null;
+        
+        let patientContactOrgId = null;
+        let logisticsOrgInfo = null;
+        
+        try {
+          const patientRes = await fetch(`${hospitalFhirUrl}/Patient/${patientId}`);
+          if (patientRes.ok) {
+            const patientData = await patientRes.json();
+            
+            // 獲取病人姓名
+            if (patientData.name && patientData.name[0]) {
+              const name = patientData.name[0];
+              if (name.text) {
+                patientName = name.text;
+              } else {
+                const family = name.family || '';
+                const given = name.given ? name.given.join(' ') : '';
+                patientName = `${family} ${given}`.trim() || patientName;
+              }
+            }
+            
+            // 獲取 email
+            debugLog(`📧 檢查病人 ${patientId} 的 telecom:`, patientData.telecom);
+            
+            if (patientData.telecom && patientData.telecom.length > 0) {
+              const emailEntry = patientData.telecom.find(t => 
+                t.system === 'email' && t.value
+              );
+              
+              if (emailEntry) {
+                patientEmail = emailEntry.value;
+                debugLog(`✅ 找到病人 ${patientId} 的 email: ${patientEmail}`);
+              } else {
+                // 檢查是否有其他 telecom 包含 email
+                for (const telecom of patientData.telecom) {
+                  if (telecom.value && telecom.value.includes('@')) {
+                    patientEmail = telecom.value;
+                    debugLog(`🔍 從 telecom 中找到可能為 email 的值: ${patientEmail}`);
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // 獲取病人 contact.organization
+            if (patientData.contact && patientData.contact[0] && patientData.contact[0].organization) {
+              patientContactOrgId = patientData.contact[0].organization.reference.replace('Organization/', '');
+              debugLog(`病人 ${patientId} 的 contact.organization ID: ${patientContactOrgId}`);
+              
+              if (patientContactOrgId) {
+                logisticsOrgInfo = await loadOrganizationFromLogistics(patientContactOrgId);
+              }
+            }
+          }
+        } catch (err) {
+          debugLog("獲取病人資料失敗:", err);
+        }
+
+        let supplierSelectHtml = '<select class="form-select supplier-select" data-sr-id="' + srId + '">';
+        supplierSelectHtml += '<option value="">請選擇物流公司 Organization...</option>';
+        
+        if (logisticsCompanies.length > 0) {
+          logisticsCompanies.forEach(company => {
+            supplierSelectHtml += `<option value="${company.id}">${company.name} (${company.id})</option>`;
+          });
+        } else {
+          supplierSelectHtml += '<option value="">沒有可用的物流公司</option>';
+        }
+        
+        supplierSelectHtml += '</select>';
+
+        let deliverToSelectHtml = '<select class="deliver-to-select-small" data-sr-id="' + srId + '">';
+        deliverToSelectHtml += '<option value="">請選擇配送目標...</option>';
+        
+        if (logisticsOrgInfo) {
+          let typeBadge = "";
+          if (logisticsOrgInfo.type === "Community Store") {
+            typeBadge = '<span class="org-type-badge type-community">社區商店</span>';
+          } else if (logisticsOrgInfo.type === "Logistics Company") {
+            typeBadge = '<span class="org-type-badge type-logistics">物流公司</span>';
+          } else if (logisticsOrgInfo.type !== "未知類型") {
+            typeBadge = `<span class="org-type-badge type-other">${logisticsOrgInfo.type}</span>`;
+          }
+          
+          deliverToSelectHtml += `<option value="${logisticsOrgInfo.id}" selected>${logisticsOrgInfo.name} ${typeBadge}</option>`;
+        } else if (patientContactOrgId) {
+          deliverToSelectHtml += `<option value="${patientContactOrgId}" selected>組織 ${patientContactOrgId} (將同步到物流端)</option>`;
+        }
+        
+        if (communityStores.length > 0) {
+          communityStores.forEach(store => {
+            if (logisticsOrgInfo && store.id === logisticsOrgInfo.id) return;
+            if (patientContactOrgId && store.id === patientContactOrgId) return;
+            
+            deliverToSelectHtml += `<option value="${store.id}">${store.name} <span class="org-type-badge type-community">社區商店</span></option>`;
+          });
+        }
+        
+        if (deliverToSelectHtml === '<select class="deliver-to-select-small" data-sr-id="' + srId + '"><option value="">請選擇配送目標...</option>') {
+          deliverToSelectHtml += '<option value="" disabled>⚠️ 沒有可用的配送目標</option>';
+        }
+        
+        deliverToSelectHtml += '</select>';
+
+        let deliverToInfoHtml = '';
+        if (logisticsOrgInfo) {
+          let typeBadge = "";
+          if (logisticsOrgInfo.type === "Community Store") {
+            typeBadge = '<span class="org-type-badge type-community">社區商店</span>';
+          } else if (logisticsOrgInfo.type === "Logistics Company") {
+            typeBadge = '<span class="org-type-badge type-logistics">物流公司</span>';
+          } else if (logisticsOrgInfo.type !== "未知類型") {
+            typeBadge = `<span class="org-type-badge type-other">${logisticsOrgInfo.type}</span>`;
+          }
+          
+          deliverToInfoHtml = `
+            <div class="deliver-to-info">
+              <strong>預設配送目標:</strong><br>
+              ${logisticsOrgInfo.name} ${typeBadge}<br>
+              <small>ID: ${logisticsOrgInfo.id}</small>
+            </div>
+            <div style="margin-top: 8px;">
+              <strong>選擇其他配送目標:</strong>
+              ${deliverToSelectHtml}
+            </div>
+          `;
+        } else if (patientContactOrgId) {
+          deliverToInfoHtml = `
+            <div class="deliver-to-info">
+              <strong>預設配送目標:</strong><br>
+              組織 ${patientContactOrgId} (將從醫院端同步)
+            </div>
+            <div style="margin-top: 8px;">
+              <strong>選擇其他配送目標:</strong>
+              ${deliverToSelectHtml}
+            </div>
+          `;
+        } else {
+          deliverToInfoHtml = `
+            <div class="deliver-to-info">
+              <strong>配送目標:</strong><br>
+              未設定 contact.organization
+            </div>
+            <div style="margin-top: 8px;">
+              <strong>選擇配送目標:</strong>
+              ${deliverToSelectHtml}
+            </div>
+          `;
+        }
+
+        row.innerHTML = `
+          <td>${srId}</td>
+          <td>${patientName} (${patientId})<br><small>Email: ${patientEmail || '無'}</small></td>
+          <td>${medicationName}</td>
+          <td>${sr.note?.map(n => n.text).join("; ") || ""}</td>
+          <td>${medIds.join("; ")}</td>
+          <td>${deliverToInfoHtml}</td>
+          <td>
+            <div class="form-group">
+              <label class="form-label">配送來源 (deliverFrom):</label>
+              <div class="fixed-value">${hospitalOrgName} (Organization/${hospitalOrgId})</div>
+              <input type="hidden" class="deliver-from-input" value="${hospitalOrgId}">
+              <input type="hidden" class="deliver-from-name" value="${hospitalOrgName}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">物流公司 (supplier):</label>
+              ${supplierSelectHtml}
+            </div>
+          </td>
+          <td>
+            <div class="action-buttons">
+              <button class="action-btn btn-warning" data-sr-id="${srId}">📦 建立 SupplyRequest</button>
+            </div>
+          </td>
+        `;
+        srTbody.appendChild(row);
+
+        const supplyBtn = row.querySelector(".btn-warning");
+        supplyBtn.addEventListener("click", async () => {
+          const deliverFromInput = row.querySelector(".deliver-from-input");
+          const deliverFromNameInput = row.querySelector(".deliver-from-name");
+          const deliverToSelect = row.querySelector(".deliver-to-select-small");
+          const supplierSelect = row.querySelector(".supplier-select");
+          
+          const selectedDeliverFromOrgId = deliverFromInput.value;
+          const selectedDeliverFromName = deliverFromNameInput.value;
+          const selectedDeliverToOrgId = deliverToSelect.value;
+          const selectedSupplierOrgId = supplierSelect.value;
+          
+          if (!selectedDeliverToOrgId) {
+            showError("請先選擇配送目標 Organization");
+            return;
+          }
+          
+          if (!selectedSupplierOrgId) {
+            showError("請先選擇物流公司 Organization");
+            return;
+          }
+
+          debugLog(`📋 建立 SupplyRequest 前確認 email: ${patientEmail}`);
+          
+          await createSupplyRequest(
+            srId, 
+            medIds, 
+            patientId, 
+            sr, 
+            selectedDeliverFromOrgId,
+            selectedSupplierOrgId,
+            selectedDeliverToOrgId,
+            deliverToSelect.options[deliverToSelect.selectedIndex].text,
+            patientEmail,
+            selectedDeliverFromName,
+            supplyBtn, 
+            row
+          );
+        });
+      }
+    }
+
+    if (srTbody.children.length === 0) {
+      srTbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="empty-state">
+            <div class="empty-state-icon">🚚</div>
+            <div>目前沒有待處理的 ServiceRequest</div>
+          </td>
+        </tr>
+      `;
+    }
+
+    document.getElementById("pendingSRCount").textContent = pendingSRCount;
+    document.getElementById("completedSRCount").textContent = completedSRCount;
+
+    debugLog("ServiceRequest 資料載入完成");
+
+  } catch (err) {
+    debugLog("載入 ServiceRequest 資料失敗:", err);
+    showError("載入資料失敗，請稍後重試");
+  }
+}
+
+// ---------- 改進的同步資源到物流端 ----------
+async function syncResourceToLogistics(resourceType, hospitalId) {
+  try {
+    debugLog(`🔄 開始同步 ${resourceType}/${hospitalId} 到物流端`);
+    
+    // 如果是 Patient，特別處理 telecom 資訊
+    if (resourceType === "Patient") {
+      try {
+        const hospitalRes = await fetch(`${hospitalFhirUrl}/Patient/${hospitalId}`);
+        if (hospitalRes.ok) {
+          const patientData = await hospitalRes.json();
+          
+          // 確保 telecom 資訊被保留
+          if (patientData.telecom) {
+            debugLog(`📧 病人 ${hospitalId} 的 telecom 資訊:`, patientData.telecom);
+          }
+          
+          // 複製資源並移除 id 和 meta
+          const resourceToSync = JSON.parse(JSON.stringify(patientData));
+          delete resourceToSync.id;
+          delete resourceToSync.meta;
+          
+          // 發送到物流端
+          const postRes = await fetch(`${logisticsFhirUrl}/Patient`, {
+            method: "POST",
+            headers: { "Content-Type": "application/fhir+json" },
+            body: JSON.stringify(resourceToSync)
+          });
+          
+          if (postRes.ok) {
+            const savedRes = await postRes.json();
+            debugLog(`✅ 成功同步 Patient 到物流端，新 ID: ${savedRes.id}`);
+            return savedRes.id;
+          } else {
+            const errText = await postRes.text();
+            debugLog(`❌ 同步 Patient 失敗:`, errText);
+          }
+        }
+      } catch (err) {
+        debugLog(`❌ 同步 Patient 失敗:`, err);
+      }
+      
+      // 如果同步失敗，嘗試創建基本資源
+      return await createBasicResource("Patient", hospitalId);
+    }
+    
+    let resourceToSync = null;
+    
+    try {
+      const hospitalRes = await fetch(`${hospitalFhirUrl}/${resourceType}/${hospitalId}`);
+      if (hospitalRes.ok) {
+        const hospitalData = await hospitalRes.json();
+        
+        if (hospitalData.resourceType === resourceType) {
+          resourceToSync = JSON.parse(JSON.stringify(hospitalData));
+          delete resourceToSync.id;
+          delete resourceToSync.meta;
+          debugLog(`✅ 從醫院端成功獲取 ${resourceType}/${hospitalId}`);
+        } else {
+          debugLog(`⚠️ 從醫院端獲取的資源類型不匹配: 期望 ${resourceType}，實際 ${hospitalData.resourceType}`);
+          return await createBasicResource(resourceType, hospitalId);
+        }
+      } else {
+        debugLog(`⚠️ 無法從醫院端獲取 ${resourceType}/${hospitalId}: ${hospitalRes.status}`);
+        
+        if (resourceType === "Organization") {
+          debugLog(`ℹ️ Organization ${hospitalId} 在醫院端不存在，假設物流端已有，跳過同步`);
+          return hospitalId;
+        }
+        
+        if (resourceType === "Patient" || resourceType === "Practitioner") {
+          debugLog(`ℹ️ 無法從醫院端獲取 ${resourceType} ${hospitalId}，創建基本資源`);
+          return await createBasicResource(resourceType, hospitalId);
+        }
+      }
+    } catch (fetchErr) {
+      debugLog(`⚠️ 獲取 ${resourceType}/${hospitalId} 失敗:`, fetchErr.message);
+      
+      if (resourceType === "Organization") {
+        debugLog(`ℹ️ 獲取 Organization ${hospitalId} 失敗，假設物流端已有，跳過同步`);
+        return hospitalId;
+      }
+      
+      if (resourceType === "Patient" || resourceType === "Practitioner") {
+        return await createBasicResource(resourceType, hospitalId);
+      }
+    }
+    
+    if (resourceToSync) {
+      if (resourceType === "Patient") {
+        if (resourceToSync.managingOrganization && resourceToSync.managingOrganization.reference) {
+          const orgRef = resourceToSync.managingOrganization.reference;
+          const orgId = orgRef.replace("Organization/", "");
+          
+          try {
+            debugLog(`📝 檢查組織 ${orgId} 在物流端是否存在...`);
+            const logisticsOrgCheck = await fetch(`${logisticsFhirUrl}/Organization/${orgId}`);
+            
+            if (!logisticsOrgCheck.ok) {
+              debugLog(`⚠️ 組織 ${orgId} 在物流端不存在或已被刪除，將從 managingOrganization 中移除`);
+              delete resourceToSync.managingOrganization;
+            } else {
+              const logisticsOrg = await logisticsOrgCheck.json();
+              if (logisticsOrg.active === false) {
+                debugLog(`⚠️ 組織 ${orgId} 在物流端已被標記為 inactive，將從 managingOrganization 中移除`);
+                delete resourceToSync.managingOrganization;
+              }
+            }
+          } catch (e) {
+            debugLog(`⚠️ 檢查組織 ${orgId} 時發生錯誤:`, e.message);
+            delete resourceToSync.managingOrganization;
+          }
+        }
+      }
+      
+      if (resourceType === "Organization") {
+        if (resourceToSync.partOf && resourceToSync.partOf.reference) {
+          const partOfRef = resourceToSync.partOf.reference;
+          const partOfOrgId = partOfRef.replace("Organization/", "");
+          
+          try {
+            debugLog(`📝 檢查上級組織 ${partOfOrgId} 在物流端是否存在...`);
+            const logisticsPartOfCheck = await fetch(`${logisticsFhirUrl}/Organization/${partOfOrgId}`);
+            
+            if (!logisticsPartOfCheck.ok) {
+              debugLog(`⚠️ 上級組織 ${partOfOrgId} 在物流端不存在，將從 partOf 中移除`);
+              delete resourceToSync.partOf;
+            } else {
+              const logisticsPartOfOrg = await logisticsPartOfCheck.json();
+              if (logisticsPartOfOrg.active === false) {
+                debugLog(`⚠️ 上級組織 ${partOfOrgId} 在物流端已被標記為 inactive，將從 partOf 中移除`);
+                delete resourceToSync.partOf;
+              }
+            }
+          } catch (e) {
+            debugLog(`⚠️ 檢查上級組織 ${partOfOrgId} 時發生錯誤:`, e.message);
+            delete resourceToSync.partOf;
+          }
+        }
+      }
+      
+      debugLog(`📤 嘗試使用 POST 創建 ${resourceType} 到物流端`);
+      
+      const postRes = await fetch(`${logisticsFhirUrl}/${resourceType}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/fhir+json" },
+        body: JSON.stringify(resourceToSync)
+      });
+      
+      if (!postRes.ok) {
+        const postErrText = await postRes.text();
+        debugLog(`❌ POST 創建 ${resourceType} 失敗:`, postErrText);
+        
+        try {
+          const getRes = await fetch(`${logisticsFhirUrl}/${resourceType}/${hospitalId}`);
+          if (getRes.ok) {
+            debugLog(`ℹ️ ${resourceType}/${hospitalId} 在物流端已存在，使用原 ID`);
+            return hospitalId;
+          }
+        } catch (getErr) {
+        }
+        
+        try {
+          const errorObj = JSON.parse(postErrText);
+          if (errorObj.issue && errorObj.issue[0] && errorObj.issue[0].diagnostics) {
+            if (errorObj.issue[0].diagnostics.includes("already exists")) {
+              debugLog(`ℹ️ ${resourceType} 已存在，使用原 ID`);
+              return hospitalId;
+            }
+          }
+        } catch (e) {
+        }
+        
+        throw new Error(`創建 ${resourceType} 失敗: ${postErrText}`);
+      }
+      
+      const savedRes = await postRes.json();
+      debugLog(`✅ 使用 POST 成功創建 ${resourceType} 到物流端，新 ID: ${savedRes.id}`);
+      return savedRes.id;
+    } else {
+      debugLog(`ℹ️ 沒有資源需要同步，直接使用原 ID: ${hospitalId}`);
+      return hospitalId;
+    }
+
+  } catch (err) {
+    debugLog(`❌ 同步 ${resourceType} 發生錯誤:`, err);
+    throw err;
+  }
+}
+
+// ---------- 創建基本資源函數 ----------
+async function createBasicResource(resourceType, originalId) {
+  try {
+    debugLog(`🛠️ 創建基本 ${resourceType} 資源，原始ID: ${originalId}`);
+    
+    let basicResource = {
+      resourceType: resourceType,
+      identifier: [{
+        system: "http://example.org/fhir/hospital-resource-id",
+        value: originalId
+      }]
+    };
+    
+    if (resourceType === "Patient") {
+      basicResource.name = [{ text: `病人 ${originalId}` }];
+      basicResource.active = true;
+    } else if (resourceType === "Practitioner") {
+      basicResource.name = [{ text: `藥師 ${originalId}` }];
+      basicResource.active = true;
+    } else if (resourceType === "Organization") {
+      basicResource.name = `組織 ${originalId}`;
+      basicResource.active = true;
+    }
+    
+    const postRes = await fetch(`${logisticsFhirUrl}/${resourceType}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/fhir+json" },
+      body: JSON.stringify(basicResource)
+    });
+    
+    if (!postRes.ok) {
+      const errText = await postRes.text();
+      debugLog(`❌ 創建基本 ${resourceType} 失敗:`, errText);
+      return originalId;
+    }
+    
+    const savedRes = await postRes.json();
+    debugLog(`✅ 成功創建基本 ${resourceType}，物流端 ID: ${savedRes.id}`);
+    return savedRes.id;
+    
+  } catch (err) {
+    debugLog(`❌ 創建基本 ${resourceType} 發生錯誤:`, err);
+    return originalId;
+  }
+}
+
+// ---------- 發送 Communication 給病人 ----------
+async function sendCommunicationToPatient(patientEmail, medicationName, supplierOrgId, logisticsFhirUrl, hospitalFhirUrl) {
+  try {
+    debugLog(`📨 準備發送通知給病人 email: ${patientEmail}`);
+    
+    if (!patientEmail) {
+      debugLog(`⚠️ 沒有病人 email，跳過發送 Communication`);
+      return false;
+    }
+    
+    let supplierName = `物流公司 ${supplierOrgId}`;
+    try {
+      const supplierRes = await fetch(`${logisticsFhirUrl}/Organization/${supplierOrgId}`);
+      if (supplierRes.ok) {
+        const supplierData = await supplierRes.json();
+        supplierName = supplierData.name || supplierName;
+      }
+    } catch (err) {
+      debugLog("無法獲取物流公司名稱:", err);
+    }
+
+    const communication = {
+      resourceType: "Communication",
+      status: "completed",
+      sent: new Date().toISOString(),
+      sender: { 
+        reference: `Organization/${supplierOrgId}`,
+        display: supplierName
+      },
+      medium: [{
+        coding: [{
+          system: "http://terminology.hl7.org/CodeSystem/v3-ParticipationMode",
+          code: "WRITTEN",
+          display: "written"
+        }],
+        text: patientEmail
+      }],
+      payload: [{ 
+        contentString: `您的藥品 ${medicationName} 已由 ${supplierName} 負責配送，請留意配送通知。`
+      }],
+      category: [{
+        coding: [{
+          system: "http://terminology.hl7.org/CodeSystem/communication-category",
+          code: "notification"
+        }],
+        text: "藥品配送通知"
+      }]
+    };
+
+    debugLog(`📤 準備發送 Communication 到物流端，病人 email: ${patientEmail}`);
+
+    const res = await fetch(`${logisticsFhirUrl}/Communication`, {
+      method: "POST",
+      headers: { "Content-Type": "application/fhir+json" },
+      body: JSON.stringify(communication)
+    });
+
+    if (res.ok) {
+      const communicationRes = await res.json();
+      debugLog(`✅ 已發送 Communication，物流端 ID: ${communicationRes.id}`);
+      return true;
+    } else {
+      const errText = await res.text();
+      debugLog(`❌ 發送 Communication 失敗:`, errText);
+      return false;
+    }
+
+  } catch (err) {
+    debugLog("發送 Communication 發生例外:", err);
+    return false;
+  }
+}
+
+// ---------- 建立 SupplyRequest ----------
+async function createSupplyRequest(srId, medIds, patientId, srData, deliverFromOrgId, supplierOrgId, deliverToOrgId, deliverToOrgName, patientEmail, hospitalOrgName, btn, row) {
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span>處理中...';
+
+  try {
+    debugLog(`🚀 開始建立 SupplyRequest，病人 email: ${patientEmail || '無'}`);
+    
+    // 抓取 MedicationRequest 驗證狀態
+    const medRes = await fetch(`${hospitalFhirUrl}/MedicationRequest/${medIds[0]}`).then(r => r.json());
+    
+    if (medRes.status !== "completed") {
+      showError("❌ 對應的 MedicationRequest 尚未完成，無法建立 SupplyRequest");
+      btn.disabled = false;
+      btn.innerHTML = "📦 建立 SupplyRequest";
+      return;
+    }
+
+    // 獲取藥品名稱
+    const medicationName = medRes.medicationCodeableConcept?.text || "藥品";
+
+    debugLog("🔄 開始同步相關資源到物流端...");
+    
+    // 同步相關資源到物流端
+    const logisticsPatientId = await syncResourceToLogistics("Patient", patientId);
+    debugLog(`✅ 物流端 Patient ID: ${logisticsPatientId}`);
+
+    const logisticsDeliverFromOrgId = await syncResourceToLogistics("Organization", deliverFromOrgId);
+    debugLog(`✅ 物流端 deliverFrom Organization ID: ${logisticsDeliverFromOrgId}`);
+
+    const logisticsDeliverToOrgId = await syncResourceToLogistics("Organization", deliverToOrgId);
+    debugLog(`✅ 物流端 deliverTo Organization ID: ${logisticsDeliverToOrgId}`);
+    
+    const logisticsPractitionerId = await syncResourceToLogistics("Practitioner", currentPractitioner.practitionerId);
+    debugLog(`✅ 物流端 Practitioner ID: ${logisticsPractitionerId}`);
+
+    // 獲取配送目標組織名稱
+    let logisticsDeliverToOrgName = deliverToOrgName;
+    try {
+      const orgRes = await fetch(`${logisticsFhirUrl}/Organization/${logisticsDeliverToOrgId}`);
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        logisticsDeliverToOrgName = orgData.name || logisticsDeliverToOrgName;
+      }
+    } catch (err) {
+      debugLog("獲取物流端組織名稱失敗:", err);
+    }
+
+    // 獲取藥師資訊
+    let pharmacistName = "藥師";
+    try {
+      const pharmacistRes = await fetch(`${logisticsFhirUrl}/Practitioner/${logisticsPractitionerId}`);
+      if (pharmacistRes.ok) {
+        const pharmacistData = await pharmacistRes.json();
+        if (pharmacistData.name && pharmacistData.name[0]) {
+          const name = pharmacistData.name[0];
+          if (name.text) {
+            pharmacistName = name.text;
+          } else {
+            const family = name.family || '';
+            const given = name.given ? name.given.join(' ') : '';
+            pharmacistName = `${family} ${given}`.trim() || pharmacistName;
+          }
+        }
+      }
+    } catch (err) {
+      debugLog("獲取物流端藥師資訊失敗:", err);
+    }
+
+    // ✅ 使用 FHIR R5 規範的 parameter 結構
+    const now = new Date().toISOString();
+    
+    // ✅ 建立 parameter 陣列，使用 valueCodeableConcept
+    let parameters = [];
+    
+    // 只添加原始的 orderDetail 參數
+    if (srData.orderDetail && srData.orderDetail.length > 0) {
+      srData.orderDetail.forEach(d => {
+        parameters.push({
+          code: {
+            text: d.text
+          },
+          // ✅ 使用 valueCodeableConcept（FHIR R5 規範）
+          valueCodeableConcept: {
+            text: d.text
+          }
+        });
+      });
+    }
+
+    const supplyReq = {
+      resourceType: "SupplyRequest",
+      status: "active",
+      category: { 
+        coding: [{
+          system: "http://terminology.hl7.org/CodeSystem/supplyrequest-category",
+          code: "medication-supply"
+        }],
+        text: "藥品配送"
+      },
+      itemCodeableConcept: medRes.medicationCodeableConcept,
+      quantity: medRes.dispenseRequest?.quantity || { value: 1, unit: "包" },
+      occurrenceDateTime: now,
+      authoredOn: medRes.authoredOn || now,
+      deliverFrom: { 
+        reference: `Organization/${logisticsDeliverFromOrgId}`,
+        display: hospitalOrgName || "醫院藥局"
+      },
+      deliverTo: { 
+        reference: `Organization/${logisticsDeliverToOrgId}`,
+        display: logisticsDeliverToOrgName || "配送目標"
+      },
+      // ✅ 新增 deliverFor 欄位（指向病人）
+      deliverFor: {
+        reference: `Patient/${logisticsPatientId}`
+      },
+      supplier: [{ 
+        reference: `Organization/${supplierOrgId}`,
+        display: "物流公司"
+      }],
+      requester: {
+        reference: `Practitioner/${logisticsPractitionerId}`,
+        display: pharmacistName
+      },
+      // ✅ 使用符合 FHIR R5 規範的 parameters
+      parameter: parameters,
+      
+      // ✅ 仍然保留 identifier 作為備用方案
+      identifier: patientEmail ? [{
+        system: "http://example.org/patient-email",
+        value: patientEmail
+      }] : [],
+      
+      // ✅ 仍然保留 note 欄位
+      note: [
+        {
+          text: `病人 Email: ${patientEmail || "無"}`
+        },
+        {
+          text: `藥品配送通知：${medicationName} 已安排配送至 ${logisticsDeliverToOrgName || "配送目標"}，由 ${hospitalOrgName} 發起`
+        },
+        {
+          text: `建立時間: ${new Date().toLocaleString('zh-TW')}，建立者: ${pharmacistName}`
+        }
+      ]
+    };
+
+    debugLog("🚀 送到物流端的 SupplyRequest (使用 FHIR R5 規範):", JSON.stringify(supplyReq, null, 2));
+
+    // 發送到物流 FHIR Server
+    const res = await fetch(`${logisticsFhirUrl}/SupplyRequest`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/fhir+json",
+        "Accept": "application/fhir+json"
+      },
+      body: JSON.stringify(supplyReq)
+    });
+
+    if (res.ok) {
+      const supplyRequestRes = await res.json();
+      
+      // ✅ 檢查返回的資源
+      debugLog("✅ 伺服器返回的完整 SupplyRequest:", JSON.stringify(supplyRequestRes, null, 2));
+      
+      // ✅ 檢查 parameter 欄位
+      if (supplyRequestRes.parameter && supplyRequestRes.parameter.length > 0) {
+        debugLog("✅ parameter 欄位已成功儲存:");
+        supplyRequestRes.parameter.forEach((p, i) => {
+          debugLog(`  [${i}] code: ${p.code?.text}`);
+          if (p.valueCodeableConcept && p.valueCodeableConcept.text) {
+            debugLog(`       valueCodeableConcept.text: ${p.valueCodeableConcept.text}`);
+          }
+        });
+      }
+      
+      // ✅ 檢查 identifier 欄位
+      if (supplyRequestRes.identifier && supplyRequestRes.identifier.length > 0) {
+        debugLog("✅ identifier 欄位已成功儲存:");
+        supplyRequestRes.identifier.forEach((id, i) => {
+          debugLog(`  [${i}] system: ${id.system}, value: ${id.value}`);
+        });
+      }
+      
+      // ✅ 檢查 deliverFor 欄位
+      if (supplyRequestRes.deliverFor) {
+        debugLog(`✅ deliverFor 欄位已設定: ${JSON.stringify(supplyRequestRes.deliverFor)}`);
+      }
+      
+      // ✅ 檢查 note 欄位
+      if (supplyRequestRes.note && supplyRequestRes.note.length > 0) {
+        debugLog("✅ note 欄位已成功儲存:");
+        supplyRequestRes.note.forEach((n, i) => {
+          debugLog(`  [${i}] ${n.text}`);
+        });
+        showSuccess(`✅ SupplyRequest 已建立，ID: ${supplyRequestRes.id}`);
+      } else {
+        showSuccess(`✅ SupplyRequest 已送到物流端，ID: ${supplyRequestRes.id}`);
+      }
+
+      // ✅ 發送 Communication 通知給病人
+      const communicationSent = await sendCommunicationToPatient(
+        patientEmail,
+        medicationName, 
+        supplierOrgId, 
+        logisticsFhirUrl,
+        hospitalFhirUrl
+      );
+      
+      if (communicationSent) {
+        showSuccess(`✅ 已發送配送通知到病人 email: ${patientEmail || '無'}`);
+      } else {
+        showInfo("⚠️ 配送通知發送失敗，但 SupplyRequest 已成功建立");
+      }
+
+      // 刪除原本的 ServiceRequest
+      await fetch(`${hospitalFhirUrl}/ServiceRequest/${srId}`, { method: "DELETE" });
+
+      // 從畫面移除該列
+      row.remove();
+
+      // 重新載入統計資料
+      loadServiceRequests();
+
+    } else {
+      const errText = await res.text();
+      debugLog("❌ 送出 SupplyRequest 失敗，狀態碼:", res.status);
+      debugLog("錯誤訊息:", errText);
+      
+      showError("❌ 送出 SupplyRequest 失敗，請檢查伺服器日誌");
+    }
+
+  } catch (err) {
+    debugLog("❌ 建立 SupplyRequest 發生例外:", err);
+    showError("建立 SupplyRequest 發生例外: " + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "📦 建立 SupplyRequest";
+  }
+}
+
+// ---------- 查看藥師相關的 Communication ----------
+async function viewPharmacistCommunications() {
+  try {
+    debugLog("開始載入藥師相關的 Communication...");
+    
+    const modal = document.getElementById('communicationModal');
+    const communicationList = document.getElementById('communicationList');
+    communicationList.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="loading"></div><p>載入中...</p></div>';
+    modal.style.display = 'block';
+    
+    // ✅ 修正：從醫院伺服器 (209) 獲取 Communication，而不是物流伺服器 (204)
+    const response = await fetch(`${hospitalFhirUrl}/Communication`);
+    if (!response.ok) {
+      throw new Error(`載入 Communication 失敗: ${response.status}`);
+    }
+    
+    const bundle = await response.json();
+    
+    communicationList.innerHTML = '';
+    
+    if (!bundle.entry || bundle.entry.length === 0) {
+      communicationList.innerHTML = `
+        <div style="text-align: center; padding: 2rem;">
+          <div class="empty-state-icon">📨</div>
+          <h3>沒有找到配送通知</h3>
+          <p>目前沒有任何配送通知記錄</p>
+        </div>
+      `;
+      return;
+    }
+    
+    // 獲取藥師資訊
+    let pharmacistName = "藥師";
+    try {
+      const pharmacistRes = await fetch(`${hospitalFhirUrl}/Practitioner/${currentPractitioner.practitionerId}`);
+      if (pharmacistRes.ok) {
+        const pharmacistData = await pharmacistRes.json();
+        if (pharmacistData.name && pharmacistData.name[0]) {
+          const name = pharmacistData.name[0];
+          if (name.text) {
+            pharmacistName = name.text;
+          } else {
+            const family = name.family || '';
+            const given = name.given ? name.given.join(' ') : '';
+            pharmacistName = `${family} ${given}`.trim() || pharmacistName;
+          }
+        }
+      }
+    } catch (err) {
+      debugLog("獲取藥師名稱失敗:", err);
+    }
+    
+    // 顯示藥師資訊
+    const pharmacistInfo = document.createElement('div');
+    pharmacistInfo.className = 'communication-item';
+    pharmacistInfo.innerHTML = `
+      <div style="margin-bottom: 1rem; padding: 1rem; background: #e8f5e9; border-radius: 8px;">
+        <strong>👨‍⚕️ 當前藥師:</strong> ${pharmacistName}<br>
+        <small>ID: ${currentPractitioner.practitionerId}</small>
+      </div>
+    `;
+    communicationList.appendChild(pharmacistInfo);
+    
+    let foundCommunications = false;
+    
+    for (const entry of bundle.entry) {
+      const communication = entry.resource;
+      
+      let isRelated = false;
+      let relationType = "";
+      
+      // 檢查是否是藥品配送通知
+      const isMedicationDelivery = communication.category && communication.category.some(cat => 
+        cat.text === "藥品配送通知" || 
+        (cat.coding && cat.coding.some(code => code.code === "notification"))
+      );
+      
+      if (isMedicationDelivery) {
+        isRelated = true;
+        relationType = "藥品配送通知";
+      }
+      
+      // 檢查發送者是否與當前藥師相關
+      if (communication.sender && communication.sender.reference) {
+        if (communication.sender.reference.includes(currentPractitioner.practitionerId)) {
+          isRelated = true;
+          relationType = relationType ? `${relationType}/發送者` : "發送者";
+        }
+      }
+      
+      // 檢查接收者是否與當前藥師相關
+      if (communication.recipient && communication.recipient.length > 0) {
+        const isRecipient = communication.recipient.some(recipient => 
+          recipient.reference && recipient.reference.includes(currentPractitioner.practitionerId)
+        );
+        if (isRecipient) {
+          isRelated = true;
+          relationType = relationType ? `${relationType}/接收者` : "接收者";
+        }
+      }
+      
+      if (isRelated) {
+        foundCommunications = true;
+        
+        let sentTime = "未知時間";
+        if (communication.sent) {
+          const sentDate = new Date(communication.sent);
+          sentTime = sentDate.toLocaleString('zh-TW');
+        }
+        
+        let senderName = "未知發送者";
+        if (communication.sender && communication.sender.display) {
+          senderName = communication.sender.display;
+        } else if (communication.sender && communication.sender.reference) {
+          senderName = communication.sender.reference;
+        }
+        
+        let messageContent = "無訊息內容";
+        if (communication.payload && communication.payload[0] && communication.payload[0].contentString) {
+          messageContent = communication.payload[0].contentString;
+        }
+        
+        let patientEmail = "無";
+        if (communication.medium && communication.medium[0] && communication.medium[0].text) {
+          patientEmail = communication.medium[0].text;
+        }
+        
+        let statusBadge = "";
+        if (communication.status === "completed") {
+          statusBadge = '<span class="communication-status status-completed">已發送</span>';
+        } else if (communication.status === "in-progress") {
+          statusBadge = '<span class="communication-status status-pending">處理中</span>';
+        } else {
+          statusBadge = `<span class="communication-status">${communication.status || "未知"}</span>`;
+        }
+        
+        const communicationItem = document.createElement('div');
+        communicationItem.className = 'communication-item';
+        communicationItem.innerHTML = `
+          <div class="communication-header">
+            <div>
+              <strong>${senderName}</strong>
+              ${statusBadge}
+            </div>
+            <small>${sentTime}</small>
+          </div>
+          <div class="communication-meta">
+            關聯類型: ${relationType} | ID: ${communication.id}
+          </div>
+          <div class="communication-body">
+            <p>${messageContent}</p>
+            <div style="margin-top: 0.5rem;">
+              <strong>病人 Email:</strong> 
+              <span class="email-badge">${patientEmail}</span>
+            </div>
+          </div>
+        `;
+        
+        communicationList.appendChild(communicationItem);
+      }
+    }
+    
+    if (!foundCommunications) {
+      communicationList.innerHTML += `
+        <div style="text-align: center; padding: 2rem;">
+          <div class="empty-state-icon">📭</div>
+          <h3>沒有找到相關的配送通知</h3>
+          <p>目前沒有與您相關的配送通知記錄</p>
+        </div>
+      `;
+    }
+    
+  } catch (err) {
+    debugLog("載入 Communication 失敗:", err);
+    const communicationList = document.getElementById('communicationList');
+    communicationList.innerHTML = `
+      <div style="text-align: center; padding: 2rem; color: #f44336;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
+        <h3>載入失敗</h3>
+        <p>${err.message}</p>
+      </div>
+    `;
+  }
+}
+// ---------- 關閉 Communication Modal ----------
+function closeCommunicationModal() {
+  const modal = document.getElementById('communicationModal');
+  modal.style.display = 'none';
+}
+
+// ---------- 初始化 ----------
+(async function init(){
+  await loadCurrentPractitioner();
+  await loadServiceRequests();
+  
+  setInterval(loadServiceRequests, 2 * 60 * 1000);
+})();
+</script>
+
+</body>
+</html>

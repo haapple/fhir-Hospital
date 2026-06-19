@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title data-i18n="forgot.pageTitle">忘記密碼</title>
+  <style>
+    /* --- 全局 & 背景 --- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      position: relative;
+    }
+
+    /* --- 語言切換下拉 --- */
+    .lang-switcher {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      appearance: none;
+      border: 1px solid #fff;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+      transition: background 0.2s, border-color 0.2s;
+      z-index: 1000;
+    }
+    .lang-switcher:hover {
+      background: rgba(255,255,255,0.25);
+      border-color: rgba(255,255,255,0.8);
+    }
+    .lang-switcher::-ms-expand { display: none; }
+
+    /* --- Nav 按鈕化 --- */
+    nav {
+      text-align: center;
+      padding: 1rem 0;
+    }
+    nav a {
+      display: inline-block;
+      margin: 0 0.5rem;
+      padding: 0.5rem 1rem;
+      border: 1px solid rgba(255,255,255,0.6);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: background 0.2s, color 0.2s;
+      backdrop-filter: blur(5px);
+    }
+    nav a:hover {
+      background: rgba(255,255,255,0.3);
+      color: #000;
+      border-color: #fff;
+    }
+    hr {
+      border: 0;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      margin: 0 2rem;
+    }
+
+    /* --- 玻璃卡片 --- */
+    .card {
+      max-width: 400px;
+      margin: 3vh auto;
+      padding: 2rem;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+    .card h2 {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      font-size: 1.6rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    /* --- 表單樣式 --- */
+    .card form {
+      display: block;
+    }
+    .card label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    .card input[type="text"] {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: background 0.2s;
+    }
+    .card input::placeholder {
+      color: rgba(255,255,255,0.7);
+    }
+    .card input:focus {
+      background: rgba(255,255,255,0.35);
+    }
+
+    /* --- 按鈕 --- */
+    .card button {
+      width: 100%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      background: #ff8a65;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .card button:hover {
+      background: #ff7043;
+      transform: translateY(-2px);
+    }
+    .card button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* --- API 回傳結果 --- */
+    #output {
+      display: none;
+      margin-top: 1.5rem;
+      padding: 0.75rem;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      color: #e0e0e0;
+      max-height: 120px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    .success { 
+      background: rgba(76, 175, 80, 0.3) !important;
+      color: #c8e6c9 !important;
+    }
+    .error { 
+      background: rgba(244, 67, 54, 0.3) !important;
+      color: #ffcdd2 !important;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+
+  <!-- 導航按鈕 -->
+  <nav>
+    <a href="/login.html" data-i18n="nav.login">登入</a>
+    <a href="/register.html" data-i18n="nav.register">註冊</a>
+    <a href="/forgot.html" data-i18n="nav.forgot">忘記密碼</a>
+  </nav>
+  <hr>
+
+  <!-- 卡片本體 -->
+  <div class="card">
+    <h2 data-i18n="forgot.title">忘記密碼</h2>
+    <form id="loginIdForm">
+      <!-- ✅ 修改：使用登入ID而不是信箱 -->
+      <label data-i18n="forgot.prompt">請輸入您的登入ID：</label>
+      <input type="text" id="loginId" placeholder="輸入您的登入ID" required>
+      <button type="submit" id="submitBtn" data-i18n="forgot.submit">寄送重設密碼連結</button>
+    </form>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    // --- i18n 初始化 ---
+    const LANG_KEY = 'app_lang';
+    const switcher = document.getElementById('langSwitcher');
+
+    async function loadLocale(lang) {
+      try {
+        const res  = await fetch(`/locales/${lang}.json`);
+        const dict = await res.json();
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const key = el.dataset.i18n;
+          if (dict[key]) el.textContent = dict[key];
+        });
+        document.documentElement.lang = lang;
+      } catch (err) {
+        console.error('載入語系檔失敗', err);
+      }
+    }
+
+    // 初始化 & 切換事件
+    const defaultLang = localStorage.getItem(LANG_KEY) || 'zh';
+    switcher.value = defaultLang;
+    loadLocale(defaultLang);
+    switcher.addEventListener('change', e => {
+      localStorage.setItem(LANG_KEY, e.target.value);
+      loadLocale(e.target.value);
+    });
+
+    // --- 表單提交 ---
+    document.getElementById('loginIdForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      
+      const output = document.getElementById('output');
+      const submitBtn = document.getElementById('submitBtn');
+      const loginId = document.getElementById('loginId').value.trim();
+      
+      // 隱藏之前的輸出
+      output.style.display = 'none';
+      output.className = '';
+      
+      // 基本驗證
+      if (!loginId) {
+        showOutput('請輸入登入ID', 'error');
+        return;
+      }
+      
+      // 設置載入狀態
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="loading"></span>處理中...';
+      
+      try {
+        const res = await fetch('/api/request-reset', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ loginId: loginId })
+        });
+
+        const data = await res.json();
+        
+        if (res.ok) {
+          showOutput('重設密碼連結已寄送到您的註冊信箱', 'success');
+        } else {
+          const errorMsg = data.error || data.detail || '請求失敗';
+          showOutput(`錯誤: ${errorMsg}`, 'error');
+        }
+        
+      } catch (error) {
+        console.error('請求失敗:', error);
+        showOutput('網路錯誤，請檢查連線後重試', 'error');
+      } finally {
+        // 恢復按鈕狀態
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '寄送重設密碼連結';
+      }
+    });
+
+    function showOutput(message, type = '') {
+      const output = document.getElementById('output');
+      output.textContent = message;
+      output.className = type;
+      output.style.display = 'block';
+      
+      // 自動隱藏成功訊息（錯誤訊息保持顯示）
+      if (type === 'success') {
+        setTimeout(() => {
+          output.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    // 頁面載入時自動聚焦到輸入框
+    window.addEventListener('load', function() {
+      document.getElementById('loginId').focus();
+    });
+  </script>
+</body>
+</html>

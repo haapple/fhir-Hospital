@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>FHIR 資源刪除工具</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #f5f7fa; padding: 40px; }
+    h1 { text-align: center; color: #333; }
+    .container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    select, button { width: 100%; padding: 10px; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    button { background-color: #ff4d4f; color: #fff; border: none; cursor: pointer; }
+    button:hover { background-color: #e04344; }
+    .info { margin-top: 15px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>FHIR 資源刪除工具</h1>
+<div class="container">
+    <label for="resourceType">選擇資源類型:</label>
+    <select id="resourceType">
+        <option value="">-- 請選擇資源類型 --</option>
+        <option value="Communication">Communication</option>
+        <option value="Practitioner">Practitioner</option>
+        <option value="PractitionerRole">PractitionerRole</option>
+        <option value="ServiceRequest">ServiceRequest</option>
+        <option value="MedicationRequest">MedicationRequest</option>
+        <option value="SupplyRequest">SupplyRequest</option>
+        <option value="Person">Person</option>
+    </select>
+
+    <label for="resourceSelect">選擇資源:</label>
+    <select id="resourceSelect">
+        <option value="">-- 請先選擇資源類型 --</option>
+    </select>
+
+    <div class="info" id="resourceInfo"></div>
+    <button onclick="deleteResource()">刪除選擇的資源</button>
+    <div class="info" id="message"></div>
+</div>
+
+<script>
+const fhirBaseUrl = "http://203.64.84.209:8080/fhir";
+
+// 當選擇資源類型時載入該類型的資源
+document.getElementById("resourceType").addEventListener("change", async function() {
+    const resourceType = this.value;
+    const select = document.getElementById("resourceSelect");
+    const infoDiv = document.getElementById("resourceInfo");
+    const messageDiv = document.getElementById("message");
+
+    // 清空舊選項
+    select.innerHTML = '<option value="">-- 請選擇資源 --</option>';
+    infoDiv.textContent = "";
+    messageDiv.textContent = "";
+
+    if (!resourceType) return;
+
+    try {
+        const res = await fetch(`${fhirBaseUrl}/${resourceType}`);
+        const data = await res.json();
+
+        if (data.entry && data.entry.length > 0) {
+            data.entry.forEach(item => {
+                const resource = item.resource;
+                let displayText = resource.id;
+
+                // 根據資源類型自定義顯示文字
+                switch(resourceType) {
+                    case "Person":
+                    case "Practitioner":
+                        displayText = resource.name && resource.name.length > 0 ? 
+                            (resource.name[0].text || (resource.name[0].given.join(" ") + " " + resource.name[0].family)) : resource.id;
+                        break;
+                    case "PractitionerRole":
+                        displayText = resource.practitioner ? resource.practitioner.reference : resource.id;
+                        break;
+                    case "MedicationRequest":
+                    case "ServiceRequest":
+                    case "SupplyRequest":
+                        displayText = (resource.medicationCodeableConcept?.text || resource.code?.text || "未知") + " (ID: " + resource.id + ")";
+                        break;
+                    case "Communication":
+                        displayText = resource.subject ? resource.subject.reference + " (ID: " + resource.id + ")" : resource.id;
+                        break;
+                }
+
+                const option = document.createElement("option");
+                option.value = resource.id;
+                option.textContent = displayText;
+                select.appendChild(option);
+            });
+        } else {
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "沒有資料";
+            select.appendChild(option);
+        }
+    } catch (err) {
+        console.error(err);
+        messageDiv.style.color = "red";
+        messageDiv.textContent = "載入資源失敗";
+    }
+});
+
+// 顯示選擇資源資訊
+document.getElementById("resourceSelect").addEventListener("change", function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const infoDiv = document.getElementById("resourceInfo");
+    if (this.value) {
+        infoDiv.textContent = `已選擇: ${selectedOption.textContent}`;
+    } else {
+        infoDiv.textContent = "";
+    }
+});
+
+// 刪除選擇資源
+async function deleteResource() {
+    const resourceType = document.getElementById("resourceType").value;
+    const select = document.getElementById("resourceSelect");
+    const resourceId = select.value;
+    const messageDiv = document.getElementById("message");
+
+    if (!resourceType || !resourceId) {
+        messageDiv.style.color = "red";
+        messageDiv.textContent = "請先選擇資源類型和資源";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${fhirBaseUrl}/${resourceType}/${resourceId}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/fhir+json" }
+        });
+
+        if (response.ok) {
+            messageDiv.style.color = "green";
+            messageDiv.textContent = `${resourceType} ${resourceId} 已刪除`;
+            select.remove(select.selectedIndex);
+            document.getElementById("resourceInfo").textContent = "";
+        } else if (response.status === 404) {
+            messageDiv.style.color = "red";
+            messageDiv.textContent = "找不到資源";
+        } else {
+            const err = await response.text();
+            messageDiv.style.color = "red";
+            messageDiv.textContent = `刪除失敗: ${err}`;
+        }
+    } catch (error) {
+        messageDiv.style.color = "red";
+        messageDiv.textContent = `錯誤: ${error.message}`;
+    }
+}
+</script>
+
+</body>
+</html>

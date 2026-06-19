@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FHIR Person 登入</title>
+  
+  <!-- 導入共享樣式 -->
+  <link rel="stylesheet" href="/shared.css">
+  
+  <style>
+    /* 頁面特定樣式 */
+    body {
+      position: relative;
+    }
+
+    .container {
+      margin: 0 auto;
+      padding-top: 2rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1.5rem;
+      justify-content: center;
+    }
+
+    .actions a {
+      font-size: 0.9rem;
+      padding: 0.5rem 1rem;
+    }
+
+    #output {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      color: #e0e0e0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .input-group {
+      position: relative;
+    }
+
+    .input-group input:invalid:not(:placeholder-shown) {
+      border-left: 3px solid #f44336;
+    }
+
+    .input-error {
+      color: #ffcdd2;
+      font-size: 0.85rem;
+      margin-top: -0.5rem;
+      margin-bottom: 0.5rem;
+      display: none;
+    }
+  </style>
+</head>
+<body class="gradient-bg">
+  <!-- 導航 -->
+  <div class="header">
+    <nav>
+      <a href="/register.html">註冊</a>
+      <a href="/forgot.html">忘記密碼</a>
+    </nav>
+  </div>
+  <hr>
+
+  <!-- 主容器 -->
+  <div class="container">
+    <div class="card card-md">
+      <h2>FHIR Person 登入系統</h2>
+      
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label for="loginId">帳號（login-id）</label>
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="loginId" 
+              name="loginId"
+              placeholder="請輸入登入帳號"
+              required
+              autocomplete="username"
+            >
+          </div>
+          <div class="input-error" id="loginId-error"></div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">密碼</label>
+          <div class="input-group">
+            <input 
+              type="password" 
+              id="password" 
+              name="password"
+              placeholder="請輸入密碼"
+              required
+              autocomplete="current-password"
+            >
+          </div>
+          <div class="input-error" id="password-error"></div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn btn-primary">登入</button>
+      </form>
+
+      <!-- 輸出結果 -->
+      <div id="output" style="display: none;"></div>
+
+      <!-- 下方操作 -->
+      <div class="actions">
+        <a href="/register.html" class="btn-nav btn-sm">沒有帳號？點此註冊</a>
+        <a href="/forgot.html" class="btn-nav btn-sm">忘記密碼？</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 導入共享 JavaScript -->
+  <script src="/shared.js"></script>
+
+  <!-- 頁面邏輯 -->
+  <script>
+    // 表單提交事件
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+
+    // 實時驗證
+    document.getElementById('loginId').addEventListener('blur', function() {
+      const error = validateField(this.value, 'loginId');
+      showFieldError('loginId', error);
+    });
+
+    document.getElementById('password').addEventListener('blur', function() {
+      const error = validateField(this.value, 'required');
+      showFieldError('password', error);
+    });
+
+    async function handleLogin(event) {
+      event.preventDefault();
+
+      const loginId = document.getElementById('loginId').value.trim();
+      const password = document.getElementById('password').value;
+      const output = document.getElementById('output');
+      const submitBtn = document.getElementById('submitBtn');
+
+      // 前端驗證
+      const loginIdError = validateField(loginId, 'loginId');
+      const passwordError = validateField(password, 'required');
+
+      showFieldError('loginId', loginIdError);
+      showFieldError('password', passwordError);
+
+      if (loginIdError || passwordError) {
+        return;
+      }
+
+      showLoading('submitBtn');
+
+      try {
+        // 調用 API
+        const data = await apiCall('/login', {
+          method: 'POST',
+          body: { loginId, password }
+        });
+
+        // 成功
+        output.textContent = '✅ 登入成功！正在導向...';
+        output.style.display = 'block';
+        output.style.color = '#4CAF50';
+
+        // 儲存用戶信息
+        storage.set('userInfo', data);
+
+        // 根據身份導向
+        setTimeout(() => {
+          if (data.isAdmin) {
+            window.location.href = '/Hospital.html';
+          } else {
+            window.location.href = '/choose-organization.html';
+          }
+        }, 1000);
+
+      } catch (error) {
+        // 錯誤
+        output.textContent = `❌ 登入失敗\n${error.message}`;
+        output.style.display = 'block';
+        output.style.color = '#ffcdd2';
+
+        hideLoading('submitBtn');
+
+        // 顯示通知
+        showAlert(`登入失敗: ${error.message}`, 'error');
+      }
+    }
+
+    // 頁面載入時檢查是否已登入
+    window.addEventListener('load', async () => {
+      const isAuth = await checkAuth().catch(() => false);
+      if (isAuth) {
+        window.location.href = '/choose-organization.html';
+      }
+    });
+  </script>
+</body>
+</html>
